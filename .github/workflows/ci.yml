@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop]
+
+jobs:
+  calidad:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # npm ci, no npm install: respeta el lockfile exactamente (OWASP A08)
+      - run: npm ci
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Pruebas (incluye matriz de control de acceso)
+        run: npm test
+
+      - name: Build del frontend
+        run: npm run build
+
+      # No rompe el build en un proyecto de una semana, pero deja el reporte
+      # visible en cada PR (OWASP A06).
+      - name: Auditoria de dependencias
+        run: npm audit --audit-level=high
+        continue-on-error: true
