@@ -27,3 +27,7 @@ coverage/
 !.vscode/extensions.json
 .idea/
 .DS_Store
+
+# Archivos temporales de Office (se crean al abrir un documento)
+~$*
+*.tmp
