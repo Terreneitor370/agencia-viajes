@@ -1,0 +1,20 @@
+[
+  {
+    "provider": "seed", "externalId": "seed-fl-001", "airline": "Aeromexico",
+    "origin": "MEX", "destination": "CUN",
+    "departureAt": "2026-09-12T08:15:00Z", "arrivalAt": "2026-09-12T10:45:00Z",
+    "stops": 0, "price": { "amount": 2450, "currency": "MXN" }, "pricingMode": "per_person"
+  },
+  {
+    "provider": "seed", "externalId": "seed-fl-002", "airline": "Volaris",
+    "origin": "MEX", "destination": "CUN",
+    "departureAt": "2026-09-12T14:30:00Z", "arrivalAt": "2026-09-12T17:10:00Z",
+    "stops": 0, "price": { "amount": 1890, "currency": "MXN" }, "pricingMode": "per_person"
+  },
+  {
+    "provider": "seed", "externalId": "seed-fl-003", "airline": "Viva",
+    "origin": "MEX", "destination": "CUN",
+    "departureAt": "2026-09-12T19:00:00Z", "arrivalAt": "2026-09-12T21:50:00Z",
+    "stops": 1, "price": { "amount": 1620, "currency": "MXN" }, "pricingMode": "per_person"
+  }
+]
