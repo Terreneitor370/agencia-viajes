@@ -9,6 +9,13 @@
     "concurrently": "^10.0.4"
   },
   "scripts": {
-    "dev": "concurrently \"npm run dev -w apps/backend\" \"npm run dev -w apps/frontend\""
+    "dev": "concurrently -n backend,frontend -c blue,magenta \"npm run dev -w apps/backend\" \"npm run dev -w apps/frontend\"",
+    "lint": "npm run lint -w apps/backend && npm run lint -w apps/frontend",
+    "test": "npm run test -w apps/backend",
+    "build": "npm run build -w apps/frontend",
+    "db:migrate": "npm run db:migrate -w apps/backend",
+    "db:seed": "npm run db:seed -w apps/backend",
+    "security:audit": "npm audit --audit-level=high",
+    "security:dast": "docker run --rm -t --network host ghcr.io/zaproxy/zaproxy:stable zap-api-scan.py -t http://localhost:3000/api/v1/openapi.json -f openapi -r zap-report.html"
   }
 }

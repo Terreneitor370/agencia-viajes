@@ -1,21 +1,38 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "server.js", 
+  "private": true,
+  "description": "API de la Agencia de Viajes",
+  "main": "src/server.js",
   "scripts": {
-    "dev": "nodemon server.js"
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "lint": "eslint .",
+    "test": "node --test",
+    "db:migrate": "node scripts/migrate.js",
+    "db:seed": "node scripts/migrate.js --seed",
+    "security:audit": "npm audit --audit-level=high"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "mysql2": "^3.10.0"
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0",
+    "hpp": "^0.2.3",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.11.5",
+    "node-cache": "^5.1.2",
+    "pino": "^9.5.0",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.0"
+    "eslint": "^10.8.0",
+    "globals": "^17.7.0",
+    "nodemon": "^3.1.9",
+    "pino-pretty": "^13.0.0",
+    "@eslint/js": "^10.0.1"
   }
 }
