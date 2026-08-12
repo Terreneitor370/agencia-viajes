@@ -1,8 +1,10 @@
-/** DUENO: Kassie (modulo B). */
+import AddToTripButton from '../../shared/AddToTripButton';
+
 const money = (amount, currency) =>
   new Intl.NumberFormat('es-MX', { style: 'currency', currency }).format(amount);
 
-const time = (iso) => (iso ? new Date(iso).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : '--');
+const time = (iso) =>
+  iso ? new Date(iso).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : '--';
 
 export default function FlightCard({ offer, travelers = 1 }) {
   const total = offer.price.amount * travelers;
@@ -15,6 +17,11 @@ export default function FlightCard({ offer, travelers = 1 }) {
           {offer.origin} → {offer.destination} · {offer.stops === 0 ? 'Directo' : `${offer.stops} escala(s)`}
         </p>
         <p className="mt-1 text-xs text-slate-400">{time(offer.departureAt)}</p>
+        {offer.estimated && (
+          <span className="inline-block mt-1 text-xs border border-dashed border-amber-400 px-2 py-0.5 rounded text-amber-600">
+            ⚡ Datos de ejemplo
+          </span>
+        )}
       </div>
 
       <div className="text-right">
@@ -23,6 +30,13 @@ export default function FlightCard({ offer, travelers = 1 }) {
         <p className="mt-1 text-sm text-slate-700">
           Total {travelers} viajero(s): <strong>{money(total, offer.price.currency)}</strong>
         </p>
+
+        <div className="mt-3">
+          <AddToTripButton 
+            item={offer} 
+            type="flight"
+          />
+        </div>
       </div>
     </article>
   );

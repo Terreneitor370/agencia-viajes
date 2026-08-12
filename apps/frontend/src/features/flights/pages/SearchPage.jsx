@@ -1,10 +1,15 @@
 /**
  * Buscador de vuelos. DUENO: Kassie (modulo B).
- * Pagina de referencia del patron: formulario controlado -> api.js -> tarjetas.
  */
 import { useState } from 'react';
 import { flightsApi } from '../api';
 import FlightCard from '../components/FlightCard';
+
+const today = new Date();
+const todayStr = today.toISOString().split('T')[0];
+const maxDate = new Date(today);
+maxDate.setMonth(maxDate.getMonth() + 11);
+const maxDateStr = maxDate.toISOString().split('T')[0];
 
 const initialForm = { origin: 'MEX', destination: 'CUN', departureDate: '', travelers: 2, cabinClass: 'economy' };
 
@@ -29,54 +34,86 @@ export default function SearchPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-lg border border-slate-200 bg-white p-5">
-        <h1 className="text-lg font-semibold">Buscar vuelos</h1>
+    <div className="min-h-screen bg-lienzo space-y-6 p-4">
+      <section className="rounded-lg border border-borde bg-superficie p-5">
+        <h1 className="text-titulo text-tinta-900">Buscar vuelos</h1>
 
         <form onSubmit={onSubmit} className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <label className="text-sm">
-            <span className="text-slate-600">Origen (IATA)</span>
-            <input value={form.origin} onChange={update('origin')} maxLength={3} required
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 uppercase" />
+            <span className="text-tinta-500">Origen (IATA)</span>
+            <input
+              value={form.origin}
+              onChange={update('origin')}
+              maxLength={3}
+              required
+              className="mt-1 w-full rounded-md border border-bordeInteractivo px-3 py-2 uppercase focus:outline-none focus:ring-2 focus:ring-azul-400"
+            />
           </label>
 
           <label className="text-sm">
-            <span className="text-slate-600">Destino (IATA)</span>
-            <input value={form.destination} onChange={update('destination')} maxLength={3} required
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 uppercase" />
+            <span className="text-tinta-500">Destino (IATA)</span>
+            <input
+              value={form.destination}
+              onChange={update('destination')}
+              maxLength={3}
+              required
+              className="mt-1 w-full rounded-md border border-bordeInteractivo px-3 py-2 uppercase focus:outline-none focus:ring-2 focus:ring-azul-400"
+            />
           </label>
 
           <label className="text-sm">
-            <span className="text-slate-600">Salida</span>
-            <input type="date" value={form.departureDate} onChange={update('departureDate')} required
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" />
+            <span className="text-tinta-500">Salida</span>
+            <input
+              type="date"
+              value={form.departureDate}
+              onChange={update('departureDate')}
+              min={todayStr}
+              max={maxDateStr}
+              required
+              className="mt-1 w-full rounded-md border border-bordeInteractivo px-3 py-2 focus:outline-none focus:ring-2 focus:ring-azul-400"
+            />
           </label>
 
           <label className="text-sm">
-            <span className="text-slate-600">Viajeros</span>
-            <input type="number" min={1} max={9} value={form.travelers} onChange={update('travelers')}
-              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2" />
+            <span className="text-tinta-500">Viajeros</span>
+            <input
+              type="number"
+              min={1}
+              max={9}
+              value={form.travelers}
+              onChange={update('travelers')}
+              className="mt-1 w-full rounded-md border border-bordeInteractivo px-3 py-2 focus:outline-none focus:ring-2 focus:ring-azul-400"
+            />
           </label>
 
-          <button type="submit" disabled={state.busy}
-            className="self-end rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50">
+          <button
+            type="submit"
+            disabled={state.busy}
+            className="self-end rounded-md bg-azul-600 px-4 py-2 text-sm font-medium text-white hover:bg-azul-700 active:bg-azul-800 disabled:opacity-50"
+          >
             {state.busy ? 'Buscando...' : 'Buscar'}
           </button>
         </form>
       </section>
 
-      {state.error && <p role="alert" className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">{state.error}</p>}
+      {state.error && (
+        <p role="alert" className="rounded-md bg-criticoSuave px-4 py-3 text-sm text-critico">
+          {state.error}
+        </p>
+      )}
 
       {state.degraded && (
-        <p className="rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          El proveedor de vuelos no respondio. Estas viendo resultados de ejemplo.
+        <p className="rounded-md bg-ambar-50 px-4 py-3 text-sm text-ambar-700 border border-dashed border-ambar-400">
+          El proveedor de vuelos no respondió. Estás viendo resultados de ejemplo.
         </p>
       )}
 
       <section className="grid gap-3">
-        {offers.map((offer) => <FlightCard key={offer.externalId} offer={offer} travelers={Number(form.travelers)} />)}
+        {offers.map((offer) => (
+          <FlightCard key={offer.externalId} offer={offer} travelers={Number(form.travelers)} />
+        ))}
         {state.searched && !state.busy && offers.length === 0 && !state.error && (
-          <p className="text-sm text-slate-500">No se encontraron vuelos para esos criterios.</p>
+          <p className="text-sm text-tinta-500">No se encontraron vuelos para esos criterios.</p>
         )}
       </section>
     </div>

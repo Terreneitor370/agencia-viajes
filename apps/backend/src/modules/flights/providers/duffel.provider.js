@@ -40,13 +40,22 @@ const headers = () => ({
 function normalize(offer) {
   const first = offer.slices?.[0] || {};
   const segments = first.segments || [];
+  
+  // Obtener la hora de salida
+  const departureTime = segments[0]?.departing_at;
+  
+  // 🔧 FILTRO: Si el vuelo ya salió, lo marcamos como no disponible
+  if (departureTime && new Date(departureTime) < new Date()) {
+    return null; // ← Este vuelo se descartará
+  }
+  
   return {
     provider: 'duffel',
     externalId: offer.id,
     airline: offer.owner?.name || offer.owner?.iata_code || 'Desconocida',
     origin: segments[0]?.origin?.iata_code ?? null,
     destination: segments.at(-1)?.destination?.iata_code ?? null,
-    departureAt: segments[0]?.departing_at ?? null,
+    departureAt: departureTime ?? null,
     arrivalAt: segments.at(-1)?.arriving_at ?? null,
     stops: Math.max(segments.length - 1, 0),
     price: { amount: Number(offer.total_amount), currency: offer.total_currency },
@@ -79,7 +88,12 @@ async function searchOffers({ origin, destination, departureDate, travelers, cab
     timeoutMs: 12000, // la busqueda de vuelos es lenta por naturaleza
   });
 
-  return raw.data.offers.map(normalize);
+  // 🔧 CORREGIDO: Normalizar y filtrar vuelos que ya salieron
+  const offers = raw.data.offers
+    .map(normalize)          // Normalizar cada oferta
+    .filter(offer => offer !== null); // Eliminar los que ya salieron
+
+  return offers;
 }
 
 module.exports = { searchOffers, normalize };
