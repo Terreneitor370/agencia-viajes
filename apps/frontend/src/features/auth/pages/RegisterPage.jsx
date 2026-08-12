@@ -6,17 +6,7 @@ import Campo from '../../../components/ui/Campo';
 import Tarjeta from '../../../components/ui/Tarjeta';
 import { ApiError } from '../../../core/api/client';
 import { authApi } from '../api';
-
-const LONGITUD_MINIMA = 12;
-// Espejo del patron de auth.schema.js: solo para avisar en vivo. La
-// validacion que cuenta es siempre la del servidor.
-const PATRON_COMUN = /^(?:password|contrasena|12345678|qwerty)/i;
-
-function evaluarContrasena(valor) {
-  const longitud = valor.length;
-  const comun = longitud > 0 && PATRON_COMUN.test(valor);
-  return { longitud, comun, cumple: longitud >= LONGITUD_MINIMA && !comun };
-}
+import { LONGITUD_MINIMA_CONTRASENA as LONGITUD_MINIMA, evaluarContrasena } from '../utils/contrasena';
 
 export default function RegisterPage() {
   const navigate = useNavigate();

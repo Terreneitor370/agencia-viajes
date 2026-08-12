@@ -11,3 +11,9 @@ export const authApi = {
   // el intercambio del codigo ocurre en el backend.
   googleUrl: () => `${import.meta.env.VITE_API_URL || '/api/v1'}/auth/google`,
 };
+
+/** Perfil propio. Distinto de /auth/me: ese trae solo lo que arma el menu, este trae el perfil completo editable. */
+export const usersApi = {
+  me: () => api.get('/users/me'),
+  updateMe: (payload) => api.patch('/users/me', payload),
+};
