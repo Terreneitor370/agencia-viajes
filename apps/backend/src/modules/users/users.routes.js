@@ -50,4 +50,27 @@ router.patch('/me', authorize(P.PROFILE_UPDATE_OWN), writeLimiter, validate({ bo
     return respond.ok(res, user);
   }));
 
-module.exports = { basePath: '/users', router };
+const openapiPaths = {
+  '/me': {
+    get: {
+      tags: ['users'], summary: 'Perfil completo del usuario autenticado',
+      responses: { 200: { description: 'Perfil' }, 401: { $ref: '#/components/responses/Unauthorized' } },
+    },
+    patch: {
+      tags: ['users'], summary: 'Actualiza el perfil propio (nombre, ciudad, moneda)',
+      requestBody: {
+        content: { 'application/json': { schema: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', minLength: 2, maxLength: 80 },
+            homeCity: { type: 'string', minLength: 2, maxLength: 80 },
+            preferredCurrency: { type: 'string', enum: ['MXN', 'USD', 'EUR'] },
+          },
+        } } },
+      },
+      responses: { 200: { description: 'Perfil actualizado' }, 401: { $ref: '#/components/responses/Unauthorized' } },
+    },
+  },
+};
+
+module.exports = { basePath: '/users', router, openapiPaths };

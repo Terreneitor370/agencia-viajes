@@ -63,6 +63,42 @@ const openapiPaths = {
   '/logout': {
     post: { tags: ['auth'], summary: 'Cerrar sesion', responses: { 204: { description: 'Sesion cerrada' } } },
   },
+  '/refresh': {
+    post: {
+      tags: ['auth'], summary: 'Renueva la sesion con el refresh token de la cookie', security: [],
+      responses: { 200: { description: 'Sesion renovada' }, 401: { $ref: '#/components/responses/Unauthorized' }, 429: { $ref: '#/components/responses/RateLimited' } },
+    },
+  },
+  '/change-password': {
+    post: {
+      tags: ['auth'], summary: 'Cambia la contrasena e invalida el resto de las sesiones',
+      requestBody: {
+        required: true,
+        content: { 'application/json': { schema: {
+          type: 'object', required: ['currentPassword', 'newPassword'],
+          properties: { currentPassword: { type: 'string' }, newPassword: { type: 'string', minLength: 12 } },
+        } } },
+      },
+      responses: { 204: { description: 'Contrasena actualizada' }, 401: { $ref: '#/components/responses/Unauthorized' } },
+    },
+  },
+  '/google': {
+    get: {
+      tags: ['auth'], summary: 'Inicia el flujo OAuth con Google (Authorization Code + PKCE)', security: [],
+      responses: { 302: { description: 'Redirige a la pantalla de consentimiento de Google' }, 400: { description: 'OAuth no configurado' } },
+    },
+  },
+  '/google/callback': {
+    get: {
+      tags: ['auth'], summary: 'Retorno de Google: canjea el code, verifica el id_token y emite sesion', security: [],
+      parameters: [
+        { name: 'code', in: 'query', schema: { type: 'string' } },
+        { name: 'state', in: 'query', schema: { type: 'string' } },
+        { name: 'error', in: 'query', schema: { type: 'string' } },
+      ],
+      responses: { 302: { description: 'Redirige al frontend, con sesion iniciada o con ?oauth_error=... si algo fallo' } },
+    },
+  },
 };
 
 module.exports = { basePath: '/auth', router, openapiPaths };
