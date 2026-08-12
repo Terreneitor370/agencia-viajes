@@ -1,15 +1,29 @@
 /** DUENO: Isa (modulo A). */
 import { useState } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../../../core/auth/useAuth';
 import { authApi } from '../api';
+
+// Google vuelve por un redirect de pagina completa, no por un fetch: el
+// backend no puede mandar un mensaje de error en el cuerpo, solo esta marca
+// en la URL. Se traduce aqui a algo que la persona pueda leer.
+const OAUTH_ERROR_MESSAGES = {
+  denegado: 'Cancelaste el inicio de sesion con Google.',
+  estado_invalido: 'Tu sesion con Google expiro, intenta de nuevo.',
+  solicitud_invalida: 'No pudimos completar el inicio de sesion con Google.',
+  fallo: 'No fue posible iniciar sesion con Google. Intenta de nuevo.',
+};
 
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [form, setForm] = useState({ email: '', password: '' });
-  const [error, setError] = useState('');
+  const [error, setError] = useState(() => {
+    const motivo = searchParams.get('oauth_error');
+    return motivo ? (OAUTH_ERROR_MESSAGES[motivo] || OAUTH_ERROR_MESSAGES.fallo) : '';
+  });
   const [busy, setBusy] = useState(false);
 
   const onSubmit = async (event) => {

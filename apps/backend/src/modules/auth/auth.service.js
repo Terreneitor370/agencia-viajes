@@ -6,8 +6,11 @@
  */
 const crypto = require('node:crypto');
 const bcrypt = require('bcryptjs');
+const { z } = require('zod');
+const { OAuth2Client } = require('google-auth-library');
 const repo = require('./auth.repository');
 const tokens = require('./auth.tokens');
+const httpClient = require('../../core/httpClient');
 const ApiError = require('../../core/ApiError');
 const logger = require('../../core/logger');
 const audit = require('../../middlewares/audit');
@@ -120,10 +123,82 @@ async function changePassword(userId, { currentPassword, newPassword }, req) {
   await audit.record('auth.password.changed', { req, entity: 'user', entityId: userId });
 }
 
-// TODO(A): googleExchange(code, verifier) -> intercambia el codigo en
-// https://oauth2.googleapis.com/token usando core/httpClient (ya esta en la
-// allowlist de egress), verifica el id_token con google-auth-library y vincula
-// o crea el usuario por `sub`. Nunca confies en el campo `email` sin
-// comprobar `email_verified === true`.
+// Cliente unico: verifica firma, issuer y expiracion del id_token contra las
+// llaves publicas de Google (JWKS), y aqui ademas fija el audience esperado.
+const googleOAuthClient = new OAuth2Client(env.GOOGLE_CLIENT_ID);
 
-module.exports = { register, login, refresh, logout, changePassword, issueSession, BCRYPT_ROUNDS };
+// No usamos .strict(): es la respuesta de un tercero, no queremos que agregar
+// un campo nuevo (Google lo hace) rompa la validacion. Solo exigimos lo que
+// realmente usamos.
+const googleTokenResponseSchema = z.object({
+  id_token: z.string().min(10),
+}).passthrough();
+
+/**
+ * Intercambia el `code` por tokens, verifica el id_token y vincula o crea el
+ * usuario. Se vincula SIEMPRE por `sub`, nunca por correo: el correo puede
+ * cambiar de dueno, el sub no.
+ */
+async function googleExchange(code, verifier, req) {
+  const tokenResponse = await httpClient.request({
+    url: 'https://oauth2.googleapis.com/token',
+    method: 'POST',
+    provider: 'google-oauth-token',
+    headers: { 'Content-Type': 'application/json' },
+    body: {
+      code,
+      client_id: env.GOOGLE_CLIENT_ID,
+      client_secret: env.GOOGLE_CLIENT_SECRET,
+      redirect_uri: env.GOOGLE_REDIRECT_URI,
+      grant_type: 'authorization_code',
+      code_verifier: verifier,
+    },
+    schema: googleTokenResponseSchema,
+  });
+
+  const ticket = await googleOAuthClient.verifyIdToken({
+    idToken: tokenResponse.id_token,
+    audience: env.GOOGLE_CLIENT_ID,
+  });
+  const payload = ticket.getPayload();
+
+  // El campo `email` de un id_token no vale nada sin esto: cualquiera puede
+  // pedir un id_token con un correo que no le pertenece si Google no lo verifico.
+  if (!payload?.email_verified) {
+    logger.security('OAUTH_GOOGLE_EMAIL_NOT_VERIFIED', { sub: payload?.sub });
+    throw ApiError.unauthorized('Tu correo de Google no esta verificado');
+  }
+
+  let user = await repo.findByGoogleSub(payload.sub);
+
+  if (!user) {
+    const existing = await repo.findByEmail(payload.email);
+    if (existing) {
+      // Ya hay una cuenta con este correo, pero no vinculada a este `sub`.
+      // Vincular aqui por correo es exactamente lo que la regla "sub, nunca
+      // correo" existe para prohibir: se rechaza en vez de fusionar cuentas.
+      logger.security('OAUTH_GOOGLE_EMAIL_ALREADY_REGISTERED', { email: payload.email });
+      throw ApiError.conflict('Ya existe una cuenta con este correo. Inicia sesion con tu contrasena.');
+    }
+    const id = crypto.randomUUID();
+    await repo.create({
+      id,
+      name: payload.name || payload.email,
+      email: payload.email,
+      googleSub: payload.sub,
+      avatarUrl: payload.picture || null,
+    });
+    user = await repo.findById(id);
+    await audit.record('auth.google.register', { req, entity: 'user', entityId: id });
+  } else if (user.status !== 'active') {
+    logger.security('LOGIN_ACCOUNT_SUSPENDED', { userId: user.id });
+    throw ApiError.unauthorized('Cuenta suspendida');
+  }
+
+  await audit.record('auth.google.login', { req, entity: 'user', entityId: user.id });
+  return issueSession(user);
+}
+
+module.exports = {
+  register, login, refresh, logout, changePassword, googleExchange, issueSession, BCRYPT_ROUNDS,
+};
