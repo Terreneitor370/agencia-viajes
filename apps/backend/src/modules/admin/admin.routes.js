@@ -33,11 +33,17 @@ router.get('/users', authorize(P.USER_READ_ANY), validate({ query: listQuery }),
     const { page, pageSize, q } = req.query;
     // LIKE parametrizado: el comodin se arma en JS, nunca dentro del SQL.
     const term = q ? `%${q}%` : '%';
+    // LIMIT/OFFSET van como literal, no como `?`: MySQL rechaza placeholders ahi
+    // en modo prepared statement (execute() truena con ER_WRONG_ARGUMENTS).
+    // Es seguro porque page/pageSize ya vienen coercionados a entero acotado
+    // por Zod (listQuery) antes de llegar aqui, nunca texto libre del usuario.
+    const limit = Number(pageSize);
+    const offset = Number(page - 1) * limit;
     const rows = await db.query(
       `SELECT id, name, email, role, status, created_at, last_login_at
          FROM users WHERE (name LIKE ? OR email LIKE ?)
-         ORDER BY created_at DESC LIMIT ? OFFSET ?`,
-      [term, term, pageSize, (page - 1) * pageSize],
+         ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`,
+      [term, term],
     );
     const [{ total }] = await db.query('SELECT COUNT(*) AS total FROM users');
     return respond.paginated(res, rows, { page, pageSize, total });
@@ -61,10 +67,13 @@ router.patch('/users/:id/role', authorize(P.USER_UPDATE_ROLE), writeLimiter,
 router.get('/audit', authorize(P.AUDIT_READ), validate({ query: listQuery }),
   asyncHandler(async (req, res) => {
     const { page, pageSize } = req.query;
+    // Mismo motivo que en /users: LIMIT/OFFSET como literal, no como `?`.
+    const limit = Number(pageSize);
+    const offset = Number(page - 1) * limit;
     const rows = await db.query(
       `SELECT id, actor_id, action, entity, entity_id, ip, correlation_id, created_at
-         FROM audit_log ORDER BY created_at DESC LIMIT ? OFFSET ?`,
-      [pageSize, (page - 1) * pageSize],
+         FROM audit_log ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`,
+      [],
     );
     const [{ total }] = await db.query('SELECT COUNT(*) AS total FROM audit_log');
     return respond.paginated(res, rows, { page, pageSize, total });
