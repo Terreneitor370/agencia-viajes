@@ -1,3 +1,58 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-lienzo text-tinta-900 font-sans text-cuerpo antialiased;
+  }
+
+  /**
+   * Foco visible en todo elemento interactivo.
+   * Se usa :focus-visible para que el anillo aparezca al navegar con teclado
+   * pero no al hacer clic con el raton.
+   */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ambar-400 ring-offset-2 ring-offset-superficie rounded;
+  }
+
+  /* Respeta a quien pidio menos movimiento en su sistema operativo. */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /**
+   * Poppins no trae cifras tabulares, asi que los digitos no tienen el mismo
+   * ancho y una cifra que cambia mueve la columna entera. Como el presupuesto
+   * se recalcula en vivo, eso se ve como un temblor.
+   *
+   * Solucion: todo precio vive en un contenedor de ancho fijo alineado a la
+   * derecha. El numero crece hacia la izquierda y la columna no se mueve.
+   * Usa esta clase en TODA cifra que pueda cambiar.
+   */
+  .precio-col {
+    @apply text-right tabular-nums;
+    min-width: 7.5rem;
+  }
+
+  .precio-col-sm {
+    @apply text-right tabular-nums;
+    min-width: 5rem;
+  }
+
+  /* Etiqueta de seccion en versalitas, como en los mockups. */
+  .etiqueta-seccion {
+    @apply text-etiqueta uppercase text-tinta-500;
+  }
+}
