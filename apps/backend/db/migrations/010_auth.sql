@@ -1,5 +1,5 @@
 -- =====================================================================
--- 010_auth.sql  |  DUENO: integrante A (Identidad, Acceso y Administracion)
+-- 010_auth.sql  |  DUENO: Isa (modulo A)
 -- Solo esta persona modifica este archivo.
 -- =====================================================================
 USE agencia_viajes;

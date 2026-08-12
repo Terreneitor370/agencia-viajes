@@ -1,5 +1,5 @@
 /**
- * Rutas del modulo Identidad. DUENO: integrante A.
+ * Rutas del modulo Identidad. DUENO: Isa (modulo A).
  *
  * Contrato con el loader: exportar { basePath, router } y, opcionalmente,
  * `openapiPaths` para que el endpoint quede cubierto por el escaneo DAST.

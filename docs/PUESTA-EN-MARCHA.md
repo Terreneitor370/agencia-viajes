@@ -136,9 +136,9 @@ Lee estos dos documentos. Sin eso, la protección contra conflictos de merge que
 
 | Módulo | Responsable | Backend | Frontend | Migración |
 |---|---|---|---|---|
-| A — Identidad, Acceso y Administración | | `src/modules/{auth,users,admin}` | `src/features/{auth,admin}` | `010_auth.sql` |
-| B — Descubrimiento (vuelos y hospedaje) | | `src/modules/{flights,stays}` | `src/features/{flights,stays}` | `030_catalog.sql` |
-| C — Viajes, Experiencias y Presupuesto | | `src/modules/{trips,experiences,budget}` | `src/features/{trips,experiences,budget}` | `020_trips.sql` |
+| A — Identidad, Acceso y Administración | **Isa** | `src/modules/{auth,users,admin}` | `src/features/{auth,admin}` | `010_auth.sql` |
+| B — Descubrimiento (vuelos y hospedaje) | **Kassie** | `src/modules/{flights,stays}` | `src/features/{flights,stays}` | `030_catalog.sql` |
+| C — Viajes, Experiencias y Presupuesto | **Jeshua** | `src/modules/{trips,experiences,budget}` | `src/features/{trips,experiences,budget}` | `020_trips.sql` |
 
 ### Crear tu rama
 
@@ -148,7 +148,22 @@ git pull origin develop
 git checkout -b feature/identidad
 ```
 
-Los nombres acordados son `feature/identidad`, `feature/descubrimiento` y `feature/viajes`.
+| Quién | Rama |
+|---|---|
+| Isa | `feature/identidad` |
+| Kassie | `feature/descubrimiento` |
+| Jeshua | `feature/viajes` |
+
+### Lo que es de todos y nadie edita solo
+
+`src/config/`, `src/core/`, `src/middlewares/`, `src/loaders/` en el backend, y `src/core/`, `src/components/ui/`, `src/layouts/` en el frontend.
+
+Dos piezas de `core/` merecen atención porque las usan dos personas distintas:
+
+- **`core/providers/geoapify.provider.js`** — Kassie lo usa para hospedaje, Jeshua para experiencias.
+- **`core/estimacion.js`** — las tablas de precios estimados, que consumen los dos.
+
+Si alguno necesita cambiarlas, se abre un PR aparte con etiqueta `core` y lo aprueban los tres. **Nunca dentro de un PR de feature.**
 
 ---
 

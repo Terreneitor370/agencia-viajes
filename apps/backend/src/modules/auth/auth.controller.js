@@ -1,5 +1,5 @@
 /**
- * Controladores del modulo Identidad. DUENO: integrante A.
+ * Controladores del modulo Identidad. DUENO: Isa (modulo A).
  *
  * El controlador SOLO traduce HTTP <-> servicio. Sin SQL, sin reglas de negocio,
  * sin `if (role === 'admin')`. La autorizacion vive en auth.routes.js.

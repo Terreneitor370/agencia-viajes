@@ -1,4 +1,4 @@
-/** Rutas de hospedaje. DUENO: integrante B. */
+/** Rutas de hospedaje. DUENO: Kassie (modulo B). */
 import { lazy, Suspense } from 'react';
 
 const StaysPage = lazy(() => import('./pages/StaysPage'));

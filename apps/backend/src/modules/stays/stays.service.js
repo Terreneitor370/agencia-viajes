@@ -1,6 +1,6 @@
-/** Servicio de hospedaje. DUENO: integrante B. */
-const geoapify = require('./providers/geoapify.provider');
-const { estimateNightlyRate } = require('../budget/budget.engine');
+/** Servicio de hospedaje. DUENO: Kassie (modulo B). */
+const geoapify = require('../../core/providers/geoapify.provider');
+const { estimateNightlyRate } = require('../../core/estimacion');
 const logger = require('../../core/logger');
 
 const nightsBetween = (a, b) => Math.max(1, Math.round((new Date(b) - new Date(a)) / 86400000));

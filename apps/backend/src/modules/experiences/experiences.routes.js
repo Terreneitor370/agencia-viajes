@@ -1,4 +1,4 @@
-/** Rutas de experiencias. DUENO: integrante C. */
+/** Rutas de experiencias. DUENO: Jeshua (modulo C). */
 const { Router } = require('express');
 const validate = require('../../middlewares/validate');
 const { optionalAuth } = require('../../middlewares/authenticate');

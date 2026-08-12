@@ -1,5 +1,5 @@
 -- =====================================================================
--- 020_trips.sql  |  DUENO: integrante C (Viajes, Experiencias y Presupuesto)
+-- 020_trips.sql  |  DUENO: Jeshua (modulo C)
 -- =====================================================================
 USE agencia_viajes;
 

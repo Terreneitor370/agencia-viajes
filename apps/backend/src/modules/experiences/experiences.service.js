@@ -1,7 +1,7 @@
-/** Servicio de experiencias. DUENO: integrante C. */
-const geoapify = require('../stays/providers/geoapify.provider');
+/** Servicio de experiencias. DUENO: Jeshua (modulo C). */
+const geoapify = require('../../core/providers/geoapify.provider');
 const { CATEGORY_MAP } = require('./experiences.schema');
-const { estimateExperiencePrice } = require('../budget/budget.engine');
+const { estimateExperiencePrice } = require('../../core/estimacion');
 const logger = require('../../core/logger');
 
 async function search({ city, countryCode, interests, radiusKm, limit }) {

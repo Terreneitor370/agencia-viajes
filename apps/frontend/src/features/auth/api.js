@@ -1,4 +1,4 @@
-/** Llamadas HTTP del modulo Identidad. DUENO: integrante A. */
+/** Llamadas HTTP del modulo Identidad. DUENO: Isa (modulo A). */
 import { api } from '../../core/api/client';
 
 export const authApi = {

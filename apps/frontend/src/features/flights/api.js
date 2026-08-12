@@ -1,4 +1,4 @@
-/** DUENO: integrante B. */
+/** DUENO: Kassie (modulo B). */
 import { api, qs } from '../../core/api/client';
 
 export const flightsApi = {

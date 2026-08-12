@@ -1,5 +1,5 @@
 -- =====================================================================
--- 030_catalog.sql  |  DUENO: integrante B (Descubrimiento: vuelos y hospedaje)
+-- 030_catalog.sql  |  DUENO: Kassie (modulo B)
 -- =====================================================================
 USE agencia_viajes;
 

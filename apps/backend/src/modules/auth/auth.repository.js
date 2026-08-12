@@ -1,5 +1,5 @@
 /**
- * Acceso a datos del modulo Identidad. DUENO: integrante A.
+ * Acceso a datos del modulo Identidad. DUENO: Isa (modulo A).
  *
  * Reglas del repositorio (aplican a los 3 modulos):
  *  1. Todo SQL vive aqui. Los servicios no escriben SQL.

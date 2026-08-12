@@ -1,4 +1,4 @@
-/** Controlador de viajes. DUENO: integrante C. */
+/** Controlador de viajes. DUENO: Jeshua (modulo C). */
 const crypto = require('node:crypto');
 const repo = require('./trips.repository');
 const respond = require('../../core/respond');

@@ -1,4 +1,4 @@
-/** Rutas de viajes. DUENO: integrante C. */
+/** Rutas de viajes. DUENO: Jeshua (modulo C). */
 import { lazy, Suspense } from 'react';
 import { ProtectedRoute } from '../../core/guards/ProtectedRoute';
 

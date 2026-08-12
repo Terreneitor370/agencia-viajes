@@ -1,4 +1,4 @@
-/** Rutas de descubrimiento (vuelos + hospedaje). DUENO: integrante B. */
+/** Rutas de descubrimiento (vuelos + hospedaje). DUENO: Kassie (modulo B). */
 import { lazy, Suspense } from 'react';
 
 const SearchPage = lazy(() => import('./pages/SearchPage'));

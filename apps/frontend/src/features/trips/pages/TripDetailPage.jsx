@@ -1,4 +1,4 @@
-/** DUENO: integrante C. TODO: itinerario + panel de presupuesto. */
+/** DUENO: Jeshua (modulo C). TODO: itinerario + panel de presupuesto. */
 import { useParams } from 'react-router-dom';
 import BudgetPanel from '../../budget/components/BudgetPanel';
 

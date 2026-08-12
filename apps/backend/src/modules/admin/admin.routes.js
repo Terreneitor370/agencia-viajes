@@ -1,5 +1,5 @@
 /**
- * Backoffice. DUENO: integrante A.
+ * Backoffice. DUENO: Isa (modulo A).
  *
  * Todo lo que hay aqui exige permisos de administrador Y queda registrado en
  * audit_log. Un panel de administracion sin bitacora es un punto ciego: si un

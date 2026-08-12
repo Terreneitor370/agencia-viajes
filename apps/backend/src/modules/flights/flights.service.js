@@ -1,4 +1,4 @@
-/** Servicio de vuelos. DUENO: integrante B. */
+/** Servicio de vuelos. DUENO: Kassie (modulo B). */
 const duffel = require('./providers/duffel.provider');
 const logger = require('../../core/logger');
 const seed = require('./flights.seed.json');

@@ -1,4 +1,4 @@
-/** DUENO: integrante A. TODO: tabla de la bitacora con filtro por accion. */
+/** DUENO: Isa (modulo A). TODO: tabla de la bitacora con filtro por accion. */
 export default function AuditLogPage() {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-6">

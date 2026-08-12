@@ -1,4 +1,4 @@
-/** DUENO: integrante B. TODO: formulario ciudad/fechas + listado de hospedaje. */
+/** DUENO: Kassie (modulo B). TODO: formulario ciudad/fechas + listado de hospedaje. */
 export default function StaysPage() {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-6">

@@ -1,4 +1,4 @@
-/** Perfil del usuario autenticado. DUENO: integrante A. */
+/** Perfil del usuario autenticado. DUENO: Isa (modulo A). */
 const { Router } = require('express');
 const { z } = require('zod');
 const validate = require('../../middlewares/validate');

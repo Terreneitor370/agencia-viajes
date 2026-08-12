@@ -1,5 +1,5 @@
 /**
- * Panel de presupuesto dinamico. DUENO: integrante C.
+ * Panel de presupuesto dinamico. DUENO: Jeshua (modulo C).
  *
  * Decision de arquitectura importante: el calculo NO se duplica en el frontend.
  * Al mover el selector de viajeros se llama a la API y se pinta lo que responde.

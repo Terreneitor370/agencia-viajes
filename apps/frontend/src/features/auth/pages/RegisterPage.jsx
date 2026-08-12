@@ -1,4 +1,4 @@
-/** DUENO: integrante A. TODO: formulario de registro + indicador de fuerza de contrasena. */
+/** DUENO: Isa (modulo A). TODO: formulario de registro + indicador de fuerza de contrasena. */
 export default function RegisterPage() {
   return (
     <div className="mx-auto max-w-sm rounded-lg border border-slate-200 bg-white p-6">

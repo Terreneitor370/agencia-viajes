@@ -1,4 +1,4 @@
-/** Rutas de hospedaje. DUENO: integrante B. */
+/** Rutas de hospedaje. DUENO: Kassie (modulo B). */
 const { Router } = require('express');
 const validate = require('../../middlewares/validate');
 const { optionalAuth } = require('../../middlewares/authenticate');

@@ -1,5 +1,5 @@
 /**
- * Contratos de entrada del modulo Identidad. DUENO: integrante A.
+ * Contratos de entrada del modulo Identidad. DUENO: Isa (modulo A).
  * `.strict()` es obligatorio: descarta cualquier campo no declarado.
  * Es lo que impide un mass assignment del tipo { email, password, role: "admin" }.
  */

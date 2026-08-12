@@ -1,5 +1,5 @@
 /**
- * Logica de negocio del modulo Identidad. DUENO: integrante A.
+ * Logica de negocio del modulo Identidad. DUENO: Isa (modulo A).
  *
  * ESQUELETO: la firma de cada funcion y las decisiones de seguridad ya estan
  * fijadas. Completa los TODO sin cambiar el contrato ni relajar los controles.

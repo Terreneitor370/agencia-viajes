@@ -1,5 +1,5 @@
 /**
- * Emision y rotacion de tokens. DUENO: integrante A.
+ * Emision y rotacion de tokens. DUENO: Isa (modulo A).
  *
  * Modelo de sesion:
  *   access_token  - JWT HS256, 15 min, cookie httpOnly. Lleva sub, role, email.

@@ -1,4 +1,4 @@
-/** Rutas de experiencias. DUENO: integrante C. */
+/** Rutas de experiencias. DUENO: Jeshua (modulo C). */
 import { lazy, Suspense } from 'react';
 
 const ExperiencesPage = lazy(() => import('./pages/ExperiencesPage'));

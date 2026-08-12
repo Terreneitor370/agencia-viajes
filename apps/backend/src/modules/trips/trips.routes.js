@@ -1,4 +1,4 @@
-/** Rutas de viajes e itinerario. DUENO: integrante C. */
+/** Rutas de viajes e itinerario. DUENO: Jeshua (modulo C). */
 const { Router } = require('express');
 const { z } = require('zod');
 const validate = require('../../middlewares/validate');

@@ -1,4 +1,4 @@
-/** DUENO: integrante A. TODO: tabla de usuarios + cambio de rol. */
+/** DUENO: Isa (modulo A). TODO: tabla de usuarios + cambio de rol. */
 export default function AdminUsersPage() {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-6">

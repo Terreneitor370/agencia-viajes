@@ -80,7 +80,7 @@ Se congelan al terminar el Día 0. Después de eso, cambiarlos requiere un PR pe
 
 Cada persona construye backend **y** frontend de su módulo, de punta a punta.
 
-### Módulo A — Identidad, Acceso y Administración
+### Módulo A — Identidad, Acceso y Administración · **Isa**
 
 **Backend:** `modules/auth/`, `modules/users/`, `modules/admin/` · **Frontend:** `features/auth/`, `features/admin/` · **Migración:** `010_auth.sql`
 
@@ -90,9 +90,9 @@ Cada persona construye backend **y** frontend de su módulo, de punta a punta.
 - Middleware RBAC y matriz de permisos
 - Panel de administración: usuarios, cambio de rol, bitácora de auditoría
 
-> **Carga extra y compensación:** este módulo entrega el andamiaje del que dependen los otros dos, así que arranca antes y termina antes (fin del Día 3). A partir del Día 4 asume el rol de revisor de seguridad de los PRs de los demás y ejecuta el escaneo DAST.
+> **Carga extra y compensación:** este módulo entrega el andamiaje del que dependen los otros dos, así que Isa arranca antes y termina antes (fin del Día 3). A partir del Día 4 asume el rol de revisora de seguridad de los PRs de Kassie y Jeshua, y ejecuta el escaneo DAST.
 
-### Módulo B — Descubrimiento: Vuelos y Hospedaje
+### Módulo B — Descubrimiento: Vuelos y Hospedaje · **Kassie**
 
 **Backend:** `modules/flights/`, `modules/stays/` · **Frontend:** `features/flights/`, `features/stays/` · **Migración:** `030_catalog.sql`
 
@@ -101,7 +101,7 @@ Cada persona construye backend **y** frontend de su módulo, de punta a punta.
 - Caché, degradación elegante con datos semilla, límite de tasa por usuario
 - Buscador, filtros y tarjetas de resultado
 
-### Módulo C — Viajes, Experiencias y Presupuesto
+### Módulo C — Viajes, Experiencias y Presupuesto · **Jeshua**
 
 **Backend:** `modules/trips/`, `modules/experiences/`, `modules/budget/` · **Frontend:** `features/trips/`, `features/experiences/`, `features/budget/` · **Migración:** `020_trips.sql`
 

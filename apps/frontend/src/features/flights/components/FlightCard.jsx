@@ -1,4 +1,4 @@
-/** DUENO: integrante B. */
+/** DUENO: Kassie (modulo B). */
 const money = (amount, currency) =>
   new Intl.NumberFormat('es-MX', { style: 'currency', currency }).format(amount);
 

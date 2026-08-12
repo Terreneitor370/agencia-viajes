@@ -1,4 +1,4 @@
-/** DUENO: integrante A. TODO: datos del perfil + cambio de contrasena. */
+/** DUENO: Isa (modulo A). TODO: datos del perfil + cambio de contrasena. */
 import { useAuth } from '../../../core/auth/useAuth';
 
 export default function ProfilePage() {

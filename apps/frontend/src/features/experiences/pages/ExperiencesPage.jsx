@@ -1,4 +1,4 @@
-/** DUENO: integrante C. TODO: selector de intereses + tarjetas de experiencias. */
+/** DUENO: Jeshua (modulo C). TODO: selector de intereses + tarjetas de experiencias. */
 export default function ExperiencesPage() {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-6">

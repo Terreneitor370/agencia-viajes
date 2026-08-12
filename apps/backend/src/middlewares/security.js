@@ -1,6 +1,6 @@
 /**
  * Cabeceras de seguridad y endurecimiento del servidor (OWASP A05).
- * DUENO: modulo Identidad y Seguridad, pero congelado tras el dia 0.
+ * DUENO: core compartido (lo endurece Isa, congelado tras el dia 0).
  */
 const helmet = require('helmet');
 const hpp = require('hpp');

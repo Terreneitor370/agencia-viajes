@@ -1,6 +1,6 @@
 /**
  * Adaptador del proveedor de vuelos (Duffel, entorno de pruebas).
- * DUENO: integrante B.
+ * DUENO: Kassie (modulo B).
  *
  * Por que un adaptador y no llamar a la API desde el servicio:
  *  - Amadeus cerro su portal self-service el 17/07/2026. El unico seguro contra

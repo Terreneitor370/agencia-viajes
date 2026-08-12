@@ -1,4 +1,4 @@
-/** Rutas del backoffice. DUENO: integrante A. */
+/** Rutas del backoffice. DUENO: Isa (modulo A). */
 import { lazy, Suspense } from 'react';
 import { PermissionRoute } from '../../core/guards/ProtectedRoute';
 

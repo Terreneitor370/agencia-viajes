@@ -1,5 +1,9 @@
 /**
- * MOTOR DE PRESUPUESTO DINAMICO. DUENO: integrante C.
+ * MOTOR DE PRESUPUESTO DINAMICO. DUENO: Jeshua (modulo C).
+ *
+ * Aritmetica pura y nada mas. La estimacion de precios NO vive aqui: se movio
+ * a core/estimacion.js porque la consume el modulo de descubrimiento, y no
+ * tiene por que depender de este archivo para eso.
  *
  * Funciones PURAS: sin base de datos, sin HTTP, sin Express. Esto es deliberado:
  *  - Se puede probar con tests unitarios en segundos, sin levantar nada.
@@ -79,31 +83,4 @@ function computeBudget({ items = [], trip, contingencyRate = 0.10, currency = 'M
   };
 }
 
-/**
- * Estimacion de tarifa por noche cuando el proveedor no entrega precio.
- * Geoapify devuelve puntos de interes, no tarifas. Se marca `estimated: true`
- * para que la interfaz lo muestre como estimacion y no como precio real:
- * presentar un numero inventado como si fuera firme es un problema de producto,
- * no solo de codigo.
- */
-const NIGHTLY_BASE_MXN = { 'accommodation.hotel': 1800, 'accommodation.apartment': 1400, 'accommodation.hostel': 600 };
-
-function estimateNightlyRate(place) {
-  const match = (place.categories || []).find((c) => NIGHTLY_BASE_MXN[c] !== undefined);
-  return { amount: NIGHTLY_BASE_MXN[match] ?? 1200, currency: 'MXN', estimated: true };
-}
-
-const EXPERIENCE_BASE_MXN = {
-  'entertainment.museum': 120, 'tourism.sights': 0, 'catering.restaurant': 350,
-  'catering.cafe': 120, 'catering.bar': 300, 'leisure.park': 0, 'natural': 0,
-};
-
-function estimateExperiencePrice(place) {
-  const match = (place.categories || []).find((c) => EXPERIENCE_BASE_MXN[c] !== undefined);
-  return { amount: EXPERIENCE_BASE_MXN[match] ?? 250, currency: 'MXN', estimated: true };
-}
-
-module.exports = {
-  PRICING_MODES, toCents, toMoney, itemSubtotalCents, computeBudget,
-  estimateNightlyRate, estimateExperiencePrice,
-};
+module.exports = { PRICING_MODES, toCents, toMoney, itemSubtotalCents, computeBudget };

@@ -1,6 +1,6 @@
 /**
  * Guardas de ruta del cliente. Solo mejoran la experiencia; la barrera real
- * esta en el backend. DUENO: integrante A.
+ * esta en el backend. DUENO: Isa (modulo A).
  */
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';

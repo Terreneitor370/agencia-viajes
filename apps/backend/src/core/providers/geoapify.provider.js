@@ -1,5 +1,11 @@
 /**
- * Adaptador de Geoapify Places. DUENO: integrante B (hospedaje) / C (experiencias).
+ * Adaptador de Geoapify Places. DUENO: core compartido.
+ *
+ * Vive en core y no dentro de un modulo porque lo consumen DOS duenos
+ * distintos: Kassie lo usa para hospedaje y Jeshua para experiencias. Si
+ * viviera en la carpeta de uno de los dos, el otro quedaria dependiendo de un
+ * archivo que no controla, y un refactor inocente romperia el modulo ajeno.
+ * Congelado tras el dia 0.
  *
  * Una sola clave gratuita (3000 creditos/dia, sin tarjeta) cubre hospedaje,
  * experiencias y geocodificacion. Menos secretos que gestionar = menos superficie.
@@ -8,9 +14,9 @@
  * contra la misma clave, sin cache la cuota diaria se agota antes de comer.
  */
 const { z } = require('zod');
-const httpClient = require('../../../core/httpClient');
-const env = require('../../../config/env');
-const ApiError = require('../../../core/ApiError');
+const httpClient = require('../httpClient');
+const env = require('../../config/env');
+const ApiError = require('../ApiError');
 
 const PLACES_URL = 'https://api.geoapify.com/v2/places';
 const GEOCODE_URL = 'https://api.geoapify.com/v1/geocode/search';

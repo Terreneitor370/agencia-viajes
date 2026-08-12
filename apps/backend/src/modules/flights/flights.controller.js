@@ -1,4 +1,4 @@
-/** Controlador de vuelos. DUENO: integrante B. */
+/** Controlador de vuelos. DUENO: Kassie (modulo B). */
 const service = require('./flights.service');
 const respond = require('../../core/respond');
 

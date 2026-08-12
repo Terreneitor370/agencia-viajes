@@ -1,5 +1,5 @@
 /**
- * Estado de sesion del frontend. DUENO: integrante A (congelado tras el dia 0).
+ * Estado de sesion del frontend. DUENO: Isa (modulo A) (congelado tras el dia 0).
  *
  * ADVERTENCIA CONCEPTUAL IMPORTANTE:
  * Lo que hay aqui es experiencia de usuario, no seguridad. Ocultar un boton no

@@ -1,4 +1,4 @@
-/** Rutas de vuelos. DUENO: integrante B. */
+/** Rutas de vuelos. DUENO: Kassie (modulo B). */
 const { Router } = require('express');
 const validate = require('../../middlewares/validate');
 const { optionalAuth } = require('../../middlewares/authenticate');

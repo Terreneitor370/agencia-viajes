@@ -1,5 +1,5 @@
 /**
- * Buscador de vuelos. DUENO: integrante B.
+ * Buscador de vuelos. DUENO: Kassie (modulo B).
  * Pagina de referencia del patron: formulario controlado -> api.js -> tarjetas.
  */
 import { useState } from 'react';

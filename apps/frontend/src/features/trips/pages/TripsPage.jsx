@@ -1,4 +1,4 @@
-/** DUENO: integrante C. TODO: listado y creacion de viajes. */
+/** DUENO: Jeshua (modulo C). TODO: listado y creacion de viajes. */
 export default function TripsPage() {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-6">

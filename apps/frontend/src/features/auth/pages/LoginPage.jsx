@@ -1,4 +1,4 @@
-/** DUENO: integrante A. */
+/** DUENO: Isa (modulo A). */
 import { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../../core/auth/useAuth';

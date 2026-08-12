@@ -1,5 +1,5 @@
 /**
- * Acceso a datos de viajes. DUENO: integrante C.
+ * Acceso a datos de viajes. DUENO: Jeshua (modulo C).
  *
  * NOTA ANTI-IDOR: fijate que `findById` recibe SIEMPRE el userId y lo mete en
  * el WHERE. No existe una funcion que traiga un viaje solo por su id. Esa

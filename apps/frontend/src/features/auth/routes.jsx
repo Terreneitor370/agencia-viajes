@@ -1,5 +1,5 @@
 /**
- * Rutas del modulo Identidad. DUENO: integrante A.
+ * Rutas del modulo Identidad. DUENO: Isa (modulo A).
  * Contrato: exportar por defecto un arreglo de rutas de react-router.
  */
 import { lazy, Suspense } from 'react';
