@@ -45,7 +45,13 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
   UNIQUE KEY uq_refresh_hash (token_hash),
   KEY idx_refresh_user (user_id),
   KEY idx_refresh_family (family_id),
-  CONSTRAINT fk_refresh_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  -- Soporta el futuro job de purga (WHERE expires_at < NOW()). Sin este indice
+  -- esa consulta es table scan completo en cuanto la tabla crece.
+  KEY idx_refresh_expires (expires_at),
+  CONSTRAINT fk_refresh_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  -- Autorreferencia: el token que reemplazo a este durante la rotacion. Sin
+  -- este FK, la cadena de rotacion puede apuntar a un id que nunca existio.
+  CONSTRAINT fk_refresh_replaced_by FOREIGN KEY (replaced_by) REFERENCES refresh_tokens(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 -- Bitacora de auditoria (OWASP A09). Append-only por convencion: la aplicacion
@@ -63,5 +69,9 @@ CREATE TABLE IF NOT EXISTS audit_log (
   created_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_audit_actor (actor_id),
   KEY idx_audit_action (action),
-  KEY idx_audit_created (created_at)
+  KEY idx_audit_created (created_at),
+  -- Mismo patron que search_history.user_id (030_catalog.sql): referencia
+  -- opcional que sobrevive al actor. ON DELETE SET NULL, nunca CASCADE: la
+  -- bitacora no puede perder el rastro solo porque el usuario se elimino.
+  CONSTRAINT fk_audit_actor FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
