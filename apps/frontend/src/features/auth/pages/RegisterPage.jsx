@@ -7,6 +7,7 @@ import Tarjeta from '../../../components/ui/Tarjeta';
 import { ApiError } from '../../../core/api/client';
 import { authApi } from '../api';
 import { LONGITUD_MINIMA_CONTRASENA as LONGITUD_MINIMA, evaluarContrasena } from '../utils/contrasena';
+import { esNombreValido } from '../utils/validacion';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -17,6 +18,7 @@ export default function RegisterPage() {
   const [creada, setCreada] = useState(false);
 
   const contrasena = useMemo(() => evaluarContrasena(form.password), [form.password]);
+  const nombreValido = esNombreValido(form.name);
 
   const editarCampo = (campo) => (event) => {
     const { value } = event.target;
@@ -70,7 +72,7 @@ export default function RegisterPage() {
           autoComplete="name"
           value={form.name}
           onChange={editarCampo('name')}
-          error={erroresCampo.name}
+          error={erroresCampo.name || (!nombreValido ? 'Solo letras y espacios, sin numeros ni simbolos' : undefined)}
           minLength={2}
           maxLength={80}
           required

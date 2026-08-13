@@ -9,7 +9,6 @@ const service = require('./auth.service');
 const tokens = require('./auth.tokens');
 const { googleCallbackSchema } = require('./auth.schema');
 const respond = require('../../core/respond');
-const ApiError = require('../../core/ApiError');
 const logger = require('../../core/logger');
 const env = require('../../config/env');
 
@@ -62,7 +61,13 @@ exports.changePassword = async (req, res) => {
  * (login CSRF).
  */
 exports.googleStart = async (req, res) => {
-  if (!env.GOOGLE_CLIENT_ID) throw ApiError.badRequest('OAuth con Google no esta configurado');
+  // Es un <a href>, no un fetch: si esto tirara un error normal, el navegador
+  // saldria de la SPA a enseñar el JSON crudo. Mejor mandarlo de vuelta al
+  // login con el mismo mecanismo de oauth_error que ya usa el callback.
+  if (!env.GOOGLE_CLIENT_ID) {
+    logger.security('OAUTH_GOOGLE_NOT_CONFIGURED', {});
+    return res.redirect(`${env.FRONTEND_URL}/login?oauth_error=no_configurado`);
+  }
   const state = crypto.randomBytes(24).toString('base64url');
   const verifier = crypto.randomBytes(32).toString('base64url'); // PKCE
   const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
@@ -105,6 +110,7 @@ exports.googleCallback = async (req, res) => {
 
   const parsed = googleCallbackSchema.safeParse(req.query);
   if (!parsed.success) {
+    logger.warn('Callback de Google con query invalido', { issues: parsed.error.issues.map((i) => i.path.join('.')) });
     clearOAuthCookies();
     return loginWithError(res, 'solicitud_invalida');
   }

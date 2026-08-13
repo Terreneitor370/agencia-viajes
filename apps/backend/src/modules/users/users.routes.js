@@ -9,13 +9,19 @@ const asyncHandler = require('../../core/asyncHandler');
 const respond = require('../../core/respond');
 const db = require('../../core/db');
 const { PERMISSIONS: P } = require('../../config/roles');
+const { name } = require('../auth/auth.schema');
 
 const router = Router();
 router.use(authenticate);
 
+// Mismo criterio que el nombre: letras, espacios, apostrofe y guion. Cubre
+// "Ciudad de Mexico", "St. Louis" (el punto es la unica diferencia con name).
+const homeCity = z.string().trim().min(2).max(80)
+  .regex(/^[\p{L}\s'.-]+$/u, 'La ciudad solo puede tener letras y espacios');
+
 const updateProfileSchema = z.object({
-  name: z.string().trim().min(2).max(80).optional(),
-  homeCity: z.string().trim().min(2).max(80).optional(),
+  name: name.optional(),
+  homeCity: homeCity.optional(),
   preferredCurrency: z.enum(['MXN', 'USD', 'EUR']).optional(),
 }).strict(); // sin `role`, sin `status`, sin `email`: no se cambian por aqui.
 

@@ -8,6 +8,7 @@ import { authApi } from '../api';
 // backend no puede mandar un mensaje de error en el cuerpo, solo esta marca
 // en la URL. Se traduce aqui a algo que la persona pueda leer.
 const OAUTH_ERROR_MESSAGES = {
+  no_configurado: 'El inicio de sesion con Google no esta disponible por ahora.',
   denegado: 'Cancelaste el inicio de sesion con Google.',
   estado_invalido: 'Tu sesion con Google expiro, intenta de nuevo.',
   solicitud_invalida: 'No pudimos completar el inicio de sesion con Google.',

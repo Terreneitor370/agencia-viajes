@@ -4,9 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import Boton from '../../../components/ui/Boton';
 import Campo from '../../../components/ui/Campo';
 import Tarjeta from '../../../components/ui/Tarjeta';
+import { ApiError } from '../../../core/api/client';
 import { useAuth } from '../../../core/auth/useAuth';
 import { authApi, usersApi } from '../api';
 import { LONGITUD_MINIMA_CONTRASENA, evaluarContrasena } from '../utils/contrasena';
+import { esCiudadValida, esNombreValido } from '../utils/validacion';
 
 const MONEDAS = ['MXN', 'USD', 'EUR'];
 const ROLES_LEGIBLES = { admin: 'Administrador', traveler: 'Viajero' };
@@ -21,6 +23,9 @@ export default function ProfilePage() {
   const [guardando, setGuardando] = useState(false);
   const [mensajePerfil, setMensajePerfil] = useState('');
   const [errorPerfil, setErrorPerfil] = useState('');
+  const [erroresCampo, setErroresCampo] = useState({});
+  const nombreValido = esNombreValido(form.name);
+  const ciudadValida = esCiudadValida(form.homeCity);
 
   useEffect(() => {
     let cancelado = false;
@@ -38,19 +43,28 @@ export default function ProfilePage() {
     return () => { cancelado = true; };
   }, []);
 
-  const editarCampo = (campo) => (event) => setForm((f) => ({ ...f, [campo]: event.target.value }));
+  const editarCampo = (campo) => (event) => {
+    const { value } = event.target;
+    setForm((f) => ({ ...f, [campo]: value }));
+    setErroresCampo((e) => (e[campo] ? { ...e, [campo]: undefined } : e));
+  };
 
   const onSubmitPerfil = async (event) => {
     event.preventDefault();
     setGuardando(true);
     setErrorPerfil('');
+    setErroresCampo({});
     setMensajePerfil('');
     try {
       const { data } = await usersApi.updateMe(form);
       setPerfil(data);
       setMensajePerfil('Tus datos se guardaron.');
     } catch (err) {
-      setErrorPerfil(err.message || 'No fue posible guardar los cambios');
+      if (err instanceof ApiError && err.details?.length) {
+        setErroresCampo(Object.fromEntries(err.details.map((d) => [d.field, d.message])));
+      } else {
+        setErrorPerfil(err.message || 'No fue posible guardar los cambios');
+      }
     } finally {
       setGuardando(false);
     }
@@ -96,6 +110,7 @@ export default function ProfilePage() {
             etiqueta="Nombre"
             value={form.name}
             onChange={editarCampo('name')}
+            error={erroresCampo.name || (!nombreValido ? 'Solo letras y espacios, sin numeros ni simbolos' : undefined)}
             minLength={2}
             maxLength={80}
             required
@@ -104,6 +119,7 @@ export default function ProfilePage() {
             etiqueta="Ciudad de origen"
             value={form.homeCity}
             onChange={editarCampo('homeCity')}
+            error={erroresCampo.homeCity || (!ciudadValida ? 'Solo letras y espacios' : undefined)}
             maxLength={80}
           />
           <div>

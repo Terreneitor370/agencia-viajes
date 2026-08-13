@@ -85,7 +85,7 @@ const openapiPaths = {
   '/google': {
     get: {
       tags: ['auth'], summary: 'Inicia el flujo OAuth con Google (Authorization Code + PKCE)', security: [],
-      responses: { 302: { description: 'Redirige a la pantalla de consentimiento de Google' }, 400: { description: 'OAuth no configurado' } },
+      responses: { 302: { description: 'Redirige a Google, o a /login?oauth_error=no_configurado si el servidor no tiene credenciales' } },
     },
   },
   '/google/callback': {
