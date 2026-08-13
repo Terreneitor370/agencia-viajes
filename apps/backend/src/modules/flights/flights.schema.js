@@ -1,26 +1,40 @@
 const { z } = require('zod');
+const { resolveIata } = require('./airports');
+const { isInWindow, todayStr } = require('./dates');
+const { CURRENCIES } = require('./currency');
 
-const iata = z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, 'Codigo IATA de 3 letras');
+// Acepta nombre de ciudad ("Cancun") o codigo IATA ("CUN"), y lo resuelve
+// a IATA para Duffel. Un IATA de 3 letras se acepta siempre.
+const iata = z.string().trim().min(2, 'Escribe un nombre de ciudad o un codigo IATA').max(80)
+  .transform((raw) => resolveIata(raw))
+  .refine((code) => code !== null, { message: 'No se encontro esa ciudad o aeropuerto' });
 
-// Validación de fecha: no puede ser anterior a hoy (sin hora)
-const futureDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato YYYY-MM-DD')
-  .refine((d) => {
-    const now = new Date();
-    const todayStr = now.getFullYear() + '-' + 
-                     String(now.getMonth() + 1).padStart(2, '0') + '-' + 
-                     String(now.getDate()).padStart(2, '0');
-    return d >= todayStr;
-  }, 'La fecha no puede ser anterior a hoy');
+// Ventana de busqueda: de HOY a HOY + 11 meses (RF y UI coinciden).
+const windowDate = z.string()
+  .refine((d) => isInWindow(d), { message: `La fecha debe estar entre ${todayStr()} y hasta 11 meses` });
+
+// Fecha de regreso: puede ir vacia cuando el vuelo es solo ida.
+const optionalWindowDate = z.string()
+  .refine((d) => d === '' || isInWindow(d), { message: `La fecha debe estar entre ${todayStr()} y hasta 11 meses` });
 
 const searchFlightsSchema = z.object({
   origin: iata,
   destination: iata,
-  departureDate: futureDate,
-  returnDate: futureDate.optional(),
-  travelers: z.coerce.number().int().min(1).max(9).default(1),
+  departureDate: windowDate,
+  returnDate: optionalWindowDate.optional(),
+  tripType: z.enum(['round_trip', 'one_way']).default('round_trip'),
+  travelers: z.coerce.number().int().min(1, 'Minimo 1 viajero').max(9, 'Maximo 9 viajeros').default(1),
   cabinClass: z.enum(['economy', 'premium_economy', 'business', 'first']).default('economy'),
-}).strict().refine((v) => v.origin !== v.destination, {
-  message: 'El origen y el destino no pueden ser iguales', path: ['destination'],
-});
+  currency: z.enum(CURRENCIES).default('MXN'),
+}).strict()
+  .refine((v) => v.origin !== v.destination, {
+    message: 'El origen y el destino no pueden ser iguales', path: ['destination'],
+  })
+  .refine((v) => v.tripType === 'one_way' || !!v.returnDate, {
+    message: 'Ingresa la fecha de regreso', path: ['returnDate'],
+  })
+  .refine((v) => !v.returnDate || v.returnDate >= v.departureDate, {
+    message: 'La fecha de regreso no puede ser anterior a la salida', path: ['returnDate'],
+  });
 
 module.exports = { searchFlightsSchema };

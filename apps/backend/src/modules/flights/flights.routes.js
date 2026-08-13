@@ -13,18 +13,29 @@ const router = Router();
 // pero el rate limit se aplica por usuario cuando hay sesion.
 router.get('/search', optionalAuth, externalApiLimiter, validate({ query: searchFlightsSchema }), asyncHandler(controller.search));
 
+// Catalogo para el autocompletado de ciudades (sin validacion de schema).
+router.get('/airports', optionalAuth, externalApiLimiter, asyncHandler(controller.airports));
+
 const openapiPaths = {
   '/search': {
     get: {
       tags: ['flights'], summary: 'Buscar ofertas de vuelo', security: [],
       parameters: [
-        { name: 'origin', in: 'query', required: true, schema: { type: 'string', pattern: '^[A-Z]{3}$' } },
-        { name: 'destination', in: 'query', required: true, schema: { type: 'string', pattern: '^[A-Z]{3}$' } },
+        { name: 'origin', in: 'query', required: true, description: 'Nombre de ciudad o codigo IATA', schema: { type: 'string' } },
+        { name: 'destination', in: 'query', required: true, description: 'Nombre de ciudad o codigo IATA', schema: { type: 'string' } },
         { name: 'departureDate', in: 'query', required: true, schema: { type: 'string', format: 'date' } },
+        { name: 'returnDate', in: 'query', schema: { type: 'string', format: 'date' } },
         { name: 'travelers', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 9 } },
         { name: 'cabinClass', in: 'query', schema: { type: 'string', enum: ['economy', 'premium_economy', 'business', 'first'] } },
+        { name: 'currency', in: 'query', schema: { type: 'string', enum: ['MXN', 'USD', 'EUR'] } },
       ],
       responses: { 200: { description: 'Lista de ofertas' }, 400: { description: 'Parametros invalidos' }, 429: { $ref: '#/components/responses/RateLimited' } },
+    },
+  },
+  '/airports': {
+    get: {
+      tags: ['flights'], summary: 'Catalogo de aeropuertos para autocompletado', security: [],
+      responses: { 200: { description: 'Lista de aeropuertos' } },
     },
   },
 };

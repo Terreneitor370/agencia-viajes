@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export default function StaySearchForm({ onSearch, loading }) {
+export default function StaySearchForm({ onSearch, loading, defaultCity = '' }) {
   // Fechas para el input date
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
@@ -11,12 +11,13 @@ export default function StaySearchForm({ onSearch, loading }) {
   const maxDateStr = maxDate.toISOString().split('T')[0];
 
   const [form, setForm] = useState({
-    city: '',
+    city: defaultCity,
     checkIn: '',
     checkOut: '',
-    travelers: 2,
+    travelers: 1,
     radiusKm: 8,
     limit: 20,
+    currency: 'MXN',
   });
 
   const handleSubmit = (e) => {
@@ -35,7 +36,7 @@ export default function StaySearchForm({ onSearch, loading }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+    <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
       {/* Ciudad */}
       <label className="text-sm">
         <span className="text-tinta-500">Ciudad</span>
@@ -79,34 +80,35 @@ export default function StaySearchForm({ onSearch, loading }) {
         />
       </label>
 
-      {/* Viajeros - con controles + y - */}
+      {/* Personas */}
       <label className="text-sm">
-        <span className="text-tinta-500">Personas</span>
-        <div className="mt-1 flex items-center gap-2 h-[42px]">
-          <button
-            type="button"
-            onClick={() => setForm({ ...form, travelers: Math.max(1, form.travelers - 1) })}
-            className="bg-lienzo hover:bg-borde rounded-md w-8 h-8 flex items-center justify-center font-bold text-tinta-700 text-lg"
-          >
-            −
-          </button>
-          <span className="text-center font-semibold text-tinta-900 text-lg w-10">
-            {form.travelers}
-          </span>
-          <button
-            type="button"
-            onClick={() => setForm({ ...form, travelers: Math.min(20, form.travelers + 1) })}
-            className="bg-lienzo hover:bg-borde rounded-md w-8 h-8 flex items-center justify-center font-bold text-tinta-700 text-lg"
-          >
-            +
-          </button>
-          <span className="text-menor text-tinta-500 ml-1">
-            {form.travelers === 1 ? 'persona' : 'personas'}
-          </span>
-        </div>
+        <span className="text-tinta-500">Personas (1-20)</span>
+        <input
+          name="travelers"
+          type="number"
+          min={1}
+          max={20}
+          value={form.travelers}
+          onChange={handleChange}
+          className="mt-1 w-full rounded-md border border-bordeInteractivo px-3 py-2 focus:outline-none focus:ring-2 focus:ring-azul-400"
+        />
       </label>
 
       {/* Botón buscar */}
+      <label className="text-sm">
+        <span className="text-tinta-500">Moneda</span>
+        <select
+          name="currency"
+          value={form.currency}
+          onChange={handleChange}
+          className="mt-1 w-full rounded-md border border-bordeInteractivo px-3 py-2 focus:outline-none focus:ring-2 focus:ring-azul-400"
+        >
+          <option value="MXN">MXN</option>
+          <option value="USD">USD</option>
+          <option value="EUR">EUR</option>
+        </select>
+      </label>
+
       <button
         type="submit"
         disabled={loading}

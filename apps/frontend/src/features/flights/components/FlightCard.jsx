@@ -6,8 +6,26 @@ const money = (amount, currency) =>
 const time = (iso) =>
   iso ? new Date(iso).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : '--';
 
+const duration = (min) => {
+  if (min == null) return null;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return h ? `${h} h ${m} min` : `${m} min`;
+};
+
+const Detail = ({ label, value }) =>
+  value ? (
+    <p className="text-xs text-slate-500">
+      <span className="text-slate-400">{label}: </span>{value}
+    </p>
+  ) : null;
+
 export default function FlightCard({ offer, travelers = 1 }) {
   const total = offer.price.amount * travelers;
+  const baggage = offer.baggage || {};
+  const hasBaggage = (baggage.carryOn || 0) + (baggage.checked || 0) > 0;
+  const wifi = offer.cabin?.wifi;
+  const seat = offer.cabin?.seat;
 
   return (
     <article className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4">
@@ -17,8 +35,45 @@ export default function FlightCard({ offer, travelers = 1 }) {
           {offer.origin} → {offer.destination} · {offer.stops === 0 ? 'Directo' : `${offer.stops} escala(s)`}
         </p>
         <p className="mt-1 text-xs text-slate-400">{time(offer.departureAt)}</p>
+        <span className="inline-block mt-1 text-xs border border-bordeFuerte px-2 py-0.5 rounded text-tinta-700">
+          {offer.tripType === 'round_trip' ? 'Redondo' : 'Solo ida'}
+        </span>
+
+        <div className="mt-2 space-y-0.5">
+          <Detail label="Vuelo" value={[offer.flightNumber, offer.aircraft].filter(Boolean).join(' · ')} />
+          <Detail label="Duración" value={duration(offer.durationMin)} />
+          <Detail
+            label="Terminales"
+            value={offer.originTerminal != null && offer.destinationTerminal != null
+              ? `${offer.originTerminal} → ${offer.destinationTerminal}`
+              : null}
+          />
+          <Detail
+            label="Equipaje"
+            value={hasBaggage
+              ? [baggage.carryOn ? `${baggage.carryOn} de mano` : '', baggage.checked ? `${baggage.checked} documentado` : '']
+                  .filter(Boolean).join(' · ')
+              : null}
+          />
+          <Detail label="Asiento" value={seat?.pitch ? `${seat.pitch}" de espacio${seat.legroom && seat.legroom !== 'n/a' ? ` · ${seat.legroom}` : ''}` : null} />
+          <Detail label="Cabina" value={offer.cabin?.name || null} />
+          <Detail label="Wi-Fi" value={wifi?.available ? (wifi.cost === 'free' ? 'Gratis' : 'De pago') : null} />
+          {offer.cabin?.power && <Detail label="Enchufe" value="Disponible" />}
+        </div>
+
+        {(offer.refundable || offer.changeable) && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {offer.refundable && (
+              <span className="text-xs border border-exito px-2 py-0.5 rounded text-exito">Reembolsable</span>
+            )}
+            {offer.changeable && (
+              <span className="text-xs border border-azul-400 px-2 py-0.5 rounded text-azul-700">Cambiable</span>
+            )}
+          </div>
+        )}
+
         {offer.estimated && (
-          <span className="inline-block mt-1 text-xs border border-dashed border-amber-400 px-2 py-0.5 rounded text-amber-600">
+          <span className="inline-block mt-2 text-xs border border-dashed border-amber-400 px-2 py-0.5 rounded text-amber-600">
             ⚡ Datos de ejemplo
           </span>
         )}

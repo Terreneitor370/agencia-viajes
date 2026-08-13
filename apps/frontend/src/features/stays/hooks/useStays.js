@@ -6,58 +6,34 @@ export function useStays() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [metadata, setMetadata] = useState({});
+  const [searched, setSearched] = useState(false);
 
   const search = async (params) => {
     setLoading(true);
     setError(null);
+    setSearched(true);
 
     try {
       const response = await staysApi.search(params);
-      console.log('useStays response:', response);
 
-      // La respuesta del backend tiene:
-      // { data: [...], location: {...}, nights: N, rooms: N, degraded: false }
-      // data es el array de hospedajes, NO response.data.data
-      const data = response.data || response;
-
-      // Si response.data es el array directamente
-      if (Array.isArray(response.data)) {
-        setStays(response.data);
-        setMetadata({
-          location: response.location || null,
-          nights: response.nights || null,
-          rooms: response.rooms || null,
-          degraded: response.degraded || false,
-        });
-      } else if (Array.isArray(data.stays)) {
-        // Formato alternativo: { stays: [...], location: {...} }
-        setStays(data.stays);
-        setMetadata({
-          location: data.location || null,
-          nights: data.nights || null,
-          rooms: data.rooms || null,
-          degraded: data.degraded || false,
-        });
-      } else {
-        // Fallback: intentar usar data directamente
-        setStays(Array.isArray(data) ? data : []);
-        setMetadata({
-          location: data.location || null,
-          nights: data.nights || null,
-          rooms: data.rooms || null,
-          degraded: data.degraded || false,
-        });
-      }
-
-      return data;
+      // El backend responde: { data: [...], location, nights, rooms, degraded }
+      const data = Array.isArray(response.data) ? response.data : [];
+      setStays(data);
+      setMetadata({
+        location: response.location || null,
+        nights: response.nights || null,
+        rooms: response.rooms || null,
+        degraded: response.degraded || false,
+      });
+      return response;
     } catch (err) {
-      console.error('useStays error:', err);
       setError(err.message || 'Error al buscar hospedaje');
       setStays([]);
+      setMetadata({});
     } finally {
       setLoading(false);
     }
   };
 
-  return { stays, loading, error, metadata, search };
+  return { stays, loading, error, metadata, searched, search };
 }

@@ -1,0 +1,41 @@
+[
+  {
+    "provider": "seed",
+    "externalId": "seed-stay-001",
+    "name": "Hotel Centro Historico",
+    "address": "A una cuadra de la plaza principal",
+    "categories": ["accommodation.hotel"],
+    "rating": 4.2,
+    "stars": 4,
+    "rooms": 23,
+    "facilities": { "internet_access": true, "air_conditioning": true, "swimming_pool": false },
+    "price": { "amount": 1800, "currency": "MXN", "estimated": true },
+    "pricingMode": "per_night_per_room"
+  },
+  {
+    "provider": "seed",
+    "externalId": "seed-stay-002",
+    "name": "Apartamentos Plaza",
+    "address": "Zona centro, a pie de los atractivos",
+    "categories": ["accommodation.apartment"],
+    "rating": 4.5,
+    "stars": 4,
+    "rooms": 8,
+    "facilities": { "internet_access": true, "kitchen": true, "air_conditioning": true },
+    "price": { "amount": 1400, "currency": "MXN", "estimated": true },
+    "pricingMode": "per_night_per_room"
+  },
+  {
+    "provider": "seed",
+    "externalId": "seed-stay-003",
+    "name": "Hostal Viajero",
+    "address": "Colonia centro, ambiente joven",
+    "categories": ["accommodation.hostel"],
+    "rating": 4.0,
+    "stars": 2,
+    "rooms": 10,
+    "facilities": { "internet_access": true },
+    "price": { "amount": 600, "currency": "MXN", "estimated": true },
+    "pricingMode": "per_night_per_room"
+  }
+]
