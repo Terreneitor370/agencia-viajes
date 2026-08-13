@@ -49,12 +49,13 @@ export default function AppLayout() {
           {isAuthenticated ? (
             <div className="flex items-center gap-3">
               <span className="hidden text-menor text-azul-100 sm:inline">MXN</span>
-              <span
-                className="grid h-8 w-8 place-items-center rounded-full bg-azul-400 text-menor font-bold text-white"
-                title={user?.email}
+              <Link
+                to="/perfil"
+                className="grid h-8 w-8 place-items-center rounded-full bg-azul-400 text-menor font-bold text-white transition-colors hover:bg-azul-300"
+                title={`Mi perfil · ${user?.email || ''}`}
               >
                 {iniciales}
-              </span>
+              </Link>
               <button
                 type="button"
                 onClick={salir}
