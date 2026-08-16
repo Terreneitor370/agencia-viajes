@@ -16,7 +16,7 @@ const maxDate = new Date(today);
 maxDate.setMonth(maxDate.getMonth() + 11);
 const maxDateStr = maxDate.toISOString().split('T')[0];
 
-const clamp = (n, min, max) => Math.min(max, Math.max(min, Number.isNaN(n) ? min : n));
+const MAX_PAX = 9;
 
 const initialForm = { tripType: 'round_trip', origin: '', destination: '', departureDate: '', returnDate: '', adults: 1, children: 0, infants: 0, cabinClass: 'economy', currency: 'MXN', baggageFilter: 'cualquiera' };
 
@@ -53,11 +53,15 @@ export default function SearchPage() {
       : { ...f, [field]: value }));
   };
 
-  const updateCount = (field, min, max) => (e) => {
-    const value = clamp(parseInt(e.target.value, 10), min, max);
+  const updateCount = (field, min) => (e) => {
+    const raw = parseInt(e.target.value, 10);
+    const value = Number.isNaN(raw) ? min : raw;
     setForm((f) => {
-      const next = { ...f, [field]: value };
-      return next;
+      // Como en Volaris: el total de pasajeros (adultos+ninos+bebes) no
+      // puede pasar de 9, aunque cada categoria tenga su propio minimo.
+      const others = f.adults + f.children + f.infants - f[field];
+      const capped = Math.max(min, Math.min(value, MAX_PAX - others));
+      return { ...f, [field]: capped };
     });
   };
 
@@ -195,37 +199,37 @@ export default function SearchPage() {
           )}
 
           <label className="text-sm">
-            <span className="text-tinta-500">Adultos (1-9)</span>
+            <span className="text-tinta-500">Adultos (13+ años)</span>
             <input
               type="number"
               min={1}
               max={9}
               value={form.adults}
-              onChange={updateCount('adults', 1, 9)}
+              onChange={updateCount('adults', 1)}
               className={inputCls}
             />
           </label>
 
           <label className="text-sm">
-            <span className="text-tinta-500">Niños</span>
+            <span className="text-tinta-500">Niños (2-12 años)</span>
             <input
               type="number"
               min={0}
               max={9}
               value={form.children}
-              onChange={updateCount('children', 0, 9)}
+              onChange={updateCount('children', 0)}
               className={inputCls}
             />
           </label>
 
           <label className="text-sm">
-            <span className="text-tinta-500">Bebés (sin asiento)</span>
+            <span className="text-tinta-500">Bebés (0-23 meses)</span>
             <input
               type="number"
               min={0}
               max={9}
               value={form.infants}
-              onChange={updateCount('infants', 0, 9)}
+              onChange={updateCount('infants', 0)}
               className={inputCls}
             />
           </label>
@@ -270,8 +274,13 @@ export default function SearchPage() {
             disabled={state.busy}
             className="lg:col-span-4 self-start rounded-md bg-azul-600 px-4 py-2 text-sm font-medium text-white hover:bg-azul-700 active:bg-azul-800 disabled:opacity-50"
           >
-            {state.busy ? 'Buscando...' : `Buscar (${totalTravelers} pasajero${totalTravelers === 1 ? '' : 's'})`}
+            {state.busy ? 'Buscando en el proveedor...' : `Buscar (${totalTravelers} pasajero${totalTravelers === 1 ? '' : 's'})`}
           </button>
+          {state.busy && (
+            <p className="text-xs text-tinta-500 lg:col-span-4">
+              La primera búsqueda tarda unos segundos; el resultado queda guardado en caché.
+            </p>
+          )}
         </form>
       </Hero>
 
@@ -298,16 +307,37 @@ export default function SearchPage() {
       )}
 
       <section className="grid gap-3">
-        {visibleOffers.map((offer) => (
+        {state.busy && (
+          <div className="grid gap-3" aria-busy="true" aria-live="polite">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="animate-pulse rounded-md border border-borde bg-superficie p-4">
+                <div className="h-4 w-1/3 rounded bg-tinta-300/50 mb-3" />
+                <div className="h-3 w-2/3 rounded bg-tinta-300/40" />
+              </div>
+            ))}
+          </div>
+        )}
+        {!state.busy && visibleOffers.map((offer) => (
           <FlightCard key={offer.externalId} offer={offer} travelers={totalTravelers} />
         ))}
-        {state.searched && !state.busy && visibleOffers.length === 0 && !state.error && (
+        {state.searched && !state.busy && offers.length === 0 && !state.error && (
           <p className="text-sm text-tinta-500">No se encontraron vuelos para esos criterios.</p>
         )}
         {state.searched && !state.busy && offers.length > 0 && visibleOffers.length === 0 && (
-          <p className="text-sm text-tinta-500">
-            Ningún vuelo de los encontrados tiene ese tipo de equipaje.
-          </p>
+          <div className="rounded-md bg-realce px-4 py-3 text-sm text-tinta-700 flex flex-wrap items-center gap-x-3 gap-y-2">
+            <span>
+              {form.baggageFilter === 'solo_mano'
+                ? `Ninguno de los ${offers.length} vuelos encontrados es solo de mano en esa clase.`
+                : `Ninguno de los ${offers.length} vuelos encontrados incluye maleta documentada en esa clase.`}
+            </span>
+            <button
+              type="button"
+              onClick={() => setForm((f) => ({ ...f, baggageFilter: 'cualquiera' }))}
+              className="rounded-md bg-azul-600 px-3 py-1 text-xs font-medium text-white hover:bg-azul-700"
+            >
+              Ver todos los vuelos
+            </button>
+          </div>
         )}
       </section>
     </div>

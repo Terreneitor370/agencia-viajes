@@ -42,7 +42,6 @@ export default function AppLayout() {
             <NavLink to="/buscar" className={enlace}>Vuelos</NavLink>
             <NavLink to="/hospedaje" className={enlace}>Hospedaje</NavLink>
             <NavLink to="/experiencias" className={enlace}>Experiencias</NavLink>
-            <NavLink to="/cotizaciones" className={enlace}>Cotizaciones</NavLink>
             {isAuthenticated && <NavLink to="/viajes" className={enlace}>Mis viajes</NavLink>}
             {can('user:read:any') && <NavLink to="/admin" className={enlace}>Administración</NavLink>}
           </nav>

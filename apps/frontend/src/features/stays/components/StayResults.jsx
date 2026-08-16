@@ -3,8 +3,18 @@ import StayCard from './StayCard';
 export default function StayResults({ stays, loading, metadata, searched }) {
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-azul-600"></div>
+      <div className="space-y-3" aria-busy="true" aria-live="polite">
+        <p className="text-sm text-tinta-500">
+          Buscando hospedajes... La primera búsqueda tarda unos segundos; el resultado queda guardado en caché.
+        </p>
+        <div className="grid gap-3">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="animate-pulse rounded-md border border-borde bg-superficie p-4">
+              <div className="h-4 w-1/3 rounded bg-tinta-300/50 mb-3" />
+              <div className="h-3 w-2/3 rounded bg-tinta-300/40" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
