@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { staysApi } from '../api';
+import { getRate, convertList } from '../../../core/api/rates';
 
 export function useStays() {
   const [stays, setStays] = useState([]);
@@ -35,5 +36,19 @@ export function useStays() {
     }
   };
 
-  return { stays, loading, error, metadata, searched, search };
+  /** Cambiar moneda NUNCA re-busca: convierte los precios en pantalla. */
+  const changeCurrency = async (next) => {
+    if (!stays.length) return;
+    const from = stays[0].price.currency;
+    if (from === next) return;
+    try {
+      const r = await getRate(from, next);
+      if (r === null) return;
+      setStays((prev) => convertList(prev, r, next));
+    } catch {
+      // Si falla la conversion se conserva la moneda actual de los resultados.
+    }
+  };
+
+  return { stays, loading, error, metadata, searched, search, changeCurrency };
 }

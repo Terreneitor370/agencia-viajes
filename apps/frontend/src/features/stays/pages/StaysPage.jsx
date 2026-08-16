@@ -17,7 +17,7 @@ const DESTINOS = [
 ];
 
 export default function StaysPage() {
-  const { stays, loading, error, metadata, searched, search } = useStays();
+  const { stays, loading, error, metadata, searched, search, changeCurrency } = useStays();
   const [citySeed, setCitySeed] = useState('');
 
   const quickSearch = ({ city }) => setCitySeed(city);
@@ -34,6 +34,7 @@ export default function StaysPage() {
           key={citySeed}
           defaultCity={citySeed}
           onSearch={search}
+          onCurrencyChange={changeCurrency}
           loading={loading}
         />
       </Hero>

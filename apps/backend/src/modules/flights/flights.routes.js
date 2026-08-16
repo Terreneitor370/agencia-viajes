@@ -16,6 +16,9 @@ router.get('/search', optionalAuth, externalApiLimiter, validate({ query: search
 // Catalogo para el autocompletado de ciudades (sin validacion de schema).
 router.get('/airports', optionalAuth, externalApiLimiter, asyncHandler(controller.airports));
 
+// Tasa de cambio para convertir precios sin re-buscar.
+router.get('/rates', optionalAuth, asyncHandler(controller.rates));
+
 const openapiPaths = {
   '/search': {
     get: {
@@ -36,6 +39,16 @@ const openapiPaths = {
     get: {
       tags: ['flights'], summary: 'Catalogo de aeropuertos para autocompletado', security: [],
       responses: { 200: { description: 'Lista de aeropuertos' } },
+    },
+  },
+  '/rates': {
+    get: {
+      tags: ['flights'], summary: 'Tasa de cambio MXN/USD/EUR', security: [],
+      parameters: [
+        { name: 'from', in: 'query', required: true, schema: { type: 'string', enum: ['MXN', 'USD', 'EUR'] } },
+        { name: 'to', in: 'query', required: true, schema: { type: 'string', enum: ['MXN', 'USD', 'EUR'] } },
+      ],
+      responses: { 200: { description: 'Tasa' }, 400: { description: 'Monedas invalidas' } },
     },
   },
 };

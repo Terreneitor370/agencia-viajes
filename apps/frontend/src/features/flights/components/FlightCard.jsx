@@ -20,16 +20,24 @@ const Detail = ({ label, value }) =>
     </p>
   ) : null;
 
+const layoverText = (layover) => {
+  if (!layover) return null;
+  const where = [layover.city, layover.iata].filter(Boolean).join(' (') + (layover.iata ? ')' : '');
+  const wait = duration(layover.durationMin);
+  return `${where}${wait ? ` · espera ${wait}` : ''}`;
+};
+
 export default function FlightCard({ offer, travelers = 1 }) {
   const total = offer.price.amount * travelers;
   const baggage = offer.baggage || {};
   const hasBaggage = (baggage.carryOn || 0) + (baggage.checked || 0) > 0;
   const wifi = offer.cabin?.wifi;
   const seat = offer.cabin?.seat;
+  const layovers = (offer.layovers || []).map(layoverText).filter(Boolean);
 
   return (
-    <article className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4">
-      <div>
+    <article className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
         <p className="font-medium">{offer.airline}</p>
         <p className="text-sm text-slate-500">
           {offer.origin} → {offer.destination} · {offer.stops === 0 ? 'Directo' : `${offer.stops} escala(s)`}
@@ -42,6 +50,7 @@ export default function FlightCard({ offer, travelers = 1 }) {
         <div className="mt-2 space-y-0.5">
           <Detail label="Vuelo" value={[offer.flightNumber, offer.aircraft].filter(Boolean).join(' · ')} />
           <Detail label="Duración" value={duration(offer.durationMin)} />
+          <Detail label="Escala" value={layovers.length ? layovers.join(' · ') : null} />
           <Detail
             label="Terminales"
             value={offer.originTerminal != null && offer.destinationTerminal != null
@@ -55,8 +64,8 @@ export default function FlightCard({ offer, travelers = 1 }) {
                   .filter(Boolean).join(' · ')
               : null}
           />
+          <Detail label="Cabina" value={[offer.cabin?.name, offer.fareBrand].filter(Boolean).join(' · ')} />
           <Detail label="Asiento" value={seat?.pitch ? `${seat.pitch}" de espacio${seat.legroom && seat.legroom !== 'n/a' ? ` · ${seat.legroom}` : ''}` : null} />
-          <Detail label="Cabina" value={offer.cabin?.name || null} />
           <Detail label="Wi-Fi" value={wifi?.available ? (wifi.cost === 'free' ? 'Gratis' : 'De pago') : null} />
           {offer.cabin?.power && <Detail label="Enchufe" value="Disponible" />}
         </div>
@@ -79,7 +88,7 @@ export default function FlightCard({ offer, travelers = 1 }) {
         )}
       </div>
 
-      <div className="text-right">
+      <div className="sm:text-right shrink-0">
         <p className="text-lg font-semibold">{money(offer.price.amount, offer.price.currency)}</p>
         <p className="text-xs text-slate-500">por persona</p>
         <p className="mt-1 text-sm text-slate-700">

@@ -36,90 +36,79 @@ export default function StayCard({ stay }) {
     .map(([key]) => FACILITY_LABELS[key]);
 
   return (
-    <article className="flex items-center justify-between rounded-lg border border-borde bg-superficie p-4">
-      <div className="flex gap-4 flex-1">
-        <div className="w-24 h-24 rounded-md flex-shrink-0 overflow-hidden bg-lienzo">
-          {imageLoading ? (
-            <div className="w-full h-full animate-pulse bg-borde"></div>
-          ) : displayImage ? (
-            <img 
-              src={displayImage} 
-              alt={stay.name || 'Hotel'}
-              className="w-full h-full object-cover"
-              loading="lazy"
-            />
-          ) : (
-            <div className="w-full h-full bg-azul-100 flex items-center justify-center text-azul-600 font-bold text-lg">
-              {stay.name?.charAt(0) || 'H'}
-            </div>
-          )}
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <p className="font-medium text-tinta-900 truncate">{stay.name}</p>
-          <p className="text-sm text-tinta-500 truncate">{stay.address}</p>
-
-          {stay.stars && (
-            <p className="text-sm text-ambar-700" aria-label={`${stay.stars} estrellas`}>
-              {'★'.repeat(stay.stars)}
-              <span className="text-sm text-bordeFuerte">{'★'.repeat(Math.max(0, 5 - stay.stars))}</span>
-            </p>
-          )}
-
-          {facilities.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1">
-              {facilities.slice(0, 4).map((label) => (
-                <span key={label} className="text-xs bg-lienzo text-tinta-700 px-2 py-0.5 rounded-full">
-                  {label}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {stay.rooms && (
-            <p className="mt-1 text-xs text-tinta-500">{stay.rooms} habitaciones</p>
-          )}
-
-          {(stay.phone || stay.website) && (
-            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs">
-              {stay.phone && <a href={`tel:${stay.phone}`} className="text-azul-700 hover:underline">{stay.phone}</a>}
-              {stay.website && (
-                <a href={stay.website} target="_blank" rel="noreferrer" className="text-azul-700 hover:underline">
-                  Sitio web
-                </a>
-              )}
-            </div>
-          )}
-        </div>
+    <article className="flex gap-3 rounded-lg border border-borde bg-superficie p-3 sm:gap-4 sm:p-4">
+      <div className="w-20 h-20 rounded-md flex-shrink-0 overflow-hidden bg-lienzo sm:w-24 sm:h-24">
+        {imageLoading ? (
+          <div className="w-full h-full animate-pulse bg-borde"></div>
+        ) : displayImage ? (
+          <img
+            src={displayImage}
+            alt={stay.name || 'Hotel'}
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <div className="w-full h-full bg-azul-100 flex items-center justify-center text-azul-600 font-bold text-lg">
+            {stay.name?.charAt(0) || 'H'}
+          </div>
+        )}
       </div>
 
-      <div className="text-right ml-4 min-w-[120px]">
-        <p className="text-lg font-semibold text-ambar-700">
-          {formatPrice(pricePerNight, currency)}
-        </p>
-        <p className="text-xs text-tinta-500">por noche</p>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-medium text-tinta-900 truncate">{stay.name}</p>
+            <p className="text-xs text-tinta-500 truncate sm:text-sm">{stay.address}</p>
+          </div>
 
-        {price.estimated && (
-          <div className="mt-1 inline-block border border-dashed border-borde rounded px-2 py-0.5">
-            <span className="text-[11px] text-tinta-500 font-medium">
-              ⚡ Precio estimado
+          <div className="shrink-0 text-right">
+            <p className="text-base font-semibold text-ambar-700 sm:text-lg">
+              {formatPrice(pricePerNight, currency)}
+            </p>
+            <p className="text-[11px] text-tinta-500">por noche</p>
+            {price.estimated && (
+              <p className="text-[10px] text-tinta-400">⚡ estimado</p>
+            )}
+          </div>
+        </div>
+
+        {stay.stars && (
+          <p className="mt-1 text-sm text-ambar-700" aria-label={`${stay.stars} estrellas`}>
+            {'★'.repeat(stay.stars)}
+            <span className="text-sm text-bordeFuerte">{'★'.repeat(Math.max(0, 5 - stay.stars))}</span>
+          </p>
+        )}
+
+        <div className="mt-1 flex flex-wrap items-center gap-1">
+          {facilities.slice(0, 4).map((label) => (
+            <span key={label} className="text-[11px] bg-lienzo text-tinta-700 px-2 py-0.5 rounded-full truncate">
+              {label}
             </span>
+          ))}
+          {stay.rooms && (
+            <span className="text-[11px] text-tinta-500">{stay.rooms} hab.</span>
+          )}
+        </div>
+
+        {(stay.phone || stay.website) && (
+          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+            {stay.phone && <a href={`tel:${stay.phone}`} className="text-azul-700 hover:underline">{stay.phone}</a>}
+            {stay.website && (
+              <a href={stay.website} target="_blank" rel="noreferrer" className="text-azul-700 hover:underline">
+                Sitio web
+              </a>
+            )}
           </div>
         )}
 
         {stay.degraded && (
           <div className="mt-1 inline-block border border-dashed border-ambar-400 rounded px-2 py-0.5 bg-ambar-50">
-            <span className="text-[11px] text-ambar-700">
-              Datos de ejemplo
-            </span>
+            <span className="text-[11px] text-ambar-700">Datos de ejemplo</span>
           </div>
         )}
 
-        <div className="mt-3">
-          <AddToTripButton 
-            item={stay} 
-            type="stay"
-          />
+        <div className="mt-2">
+          <AddToTripButton item={stay} type="stay" />
         </div>
       </div>
     </article>

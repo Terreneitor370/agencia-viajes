@@ -1,12 +1,26 @@
 /** Controlador de vuelos. DUENO: Kassie (modulo B). */
 const service = require('./flights.service');
 const respond = require('../../core/respond');
+const ApiError = require('../../core/ApiError');
 const db = require('../../core/db');
 const logger = require('../../core/logger');
 const { airportsOptions } = require('./airports');
+const { rate, CURRENCIES } = require('./currency');
 
 /** Catalogo para el autocompletado de origen/destino del formulario. */
 exports.airports = (req, res) => respond.ok(res, airportsOptions());
+
+/** Tasa de cambio: permite convertir precios en el frontend sin re-buscar. */
+exports.rates = async (req, res) => {
+  const from = String(req.query.from || '').toUpperCase();
+  const to = String(req.query.to || '').toUpperCase();
+  if (!CURRENCIES.includes(from) || !CURRENCIES.includes(to)) {
+    throw ApiError.badRequest('Indica monedas validas: MXN, USD o EUR');
+  }
+  const value = await rate(from, to);
+  if (value === null) throw ApiError.upstream('No se pudo obtener la tasa de cambio');
+  return respond.ok(res, { from, to, rate: value });
+};
 
 exports.search = async (req, res) => {
   const { offers, degraded } = await service.search(req.query);

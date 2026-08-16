@@ -18,6 +18,7 @@ const AIRPORTS = [
   { city: 'guadalajara', name: 'Aeropuerto Internacional de Guadalajara', iata: 'GDL', country: 'MX' },
   { city: 'monterrey', name: 'Aeropuerto Internacional de Monterrey', iata: 'MTY', country: 'MX' },
   { city: 'tijuana', name: 'Aeropuerto Internacional de Tijuana', iata: 'TIJ', country: 'MX' },
+  { city: 'mexicali', name: 'Aeropuerto Internacional de Mexicali', iata: 'MXL', country: 'MX', alias: ['general rodolfo sanchez taboada'] },
   { city: 'puerto vallarta', name: 'Aeropuerto Internacional de Puerto Vallarta', iata: 'PVR', country: 'MX' },
   { city: 'los cabos', name: 'Aeropuerto Internacional de Los Cabos', iata: 'SJD', country: 'MX', alias: ['san jose del cabo', 'cabo san lucas'] },
   { city: 'leon', name: 'Aeropuerto Internacional del Bajio', iata: 'BJX', country: 'MX', alias: ['guanajuato', 'bajio', 'silo'] },

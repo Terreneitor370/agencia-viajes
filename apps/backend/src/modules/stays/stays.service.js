@@ -3,7 +3,9 @@ const geoapify = require('../../core/providers/geoapify.provider');
 const { estimateNightlyRate } = require('../../core/estimacion');
 const logger = require('../../core/logger');
 const seed = require('./stays.seed.json');
-const { convert } = require('../flights/currency');
+const { rate } = require('../flights/currency');
+
+const round2 = (n) => Math.round(n * 100) / 100;
 
 const nightsBetween = (a, b) => Math.max(1, Math.round((new Date(b) - new Date(a)) / 86400000));
 
@@ -27,12 +29,15 @@ const varyEstimatedRate = (base, place) => {
   return Math.round(base * factor);
 };
 
-/** Aplica la moneda pedida al precio de cada hospedaje (los precios base son MXN). */
+/** Aplica la moneda pedida con UNA sola tasa (los precios base son MXN). */
 async function applyCurrency(stays, currency) {
-  return Promise.all(stays.map(async (stay) => {
-    const amount = await convert(stay.price.amount, stay.price.currency, currency);
-    if (amount === null) return stay;
-    return { ...stay, price: { ...stay.price, amount, currency } };
+  const from = stays[0]?.price?.currency;
+  if (!from || from === currency) return stays;
+  const r = await rate(from, currency);
+  if (r === null) return stays;
+  return stays.map((stay) => ({
+    ...stay,
+    price: { ...stay.price, amount: round2(stay.price.amount * r), currency },
   }));
 }
 

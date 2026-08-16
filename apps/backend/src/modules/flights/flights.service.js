@@ -2,14 +2,23 @@
 const duffel = require('./providers/duffel.provider');
 const logger = require('../../core/logger');
 const seed = require('./flights.seed.json');
-const { convert } = require('./currency');
+const { rate } = require('./currency');
 
-/** Convierte cada oferta a la moneda pedida; si falla, conserva la original. */
+const round2 = (n) => Math.round(n * 100) / 100;
+
+/**
+ * Convierte todas las ofertas con UNA sola tasa de cambio (no 1 request por
+ * oferta: Frankfurter no la necesita y el grupo completo comparte la misma
+ * moneda base). Si falla, conserva cada precio original.
+ */
 async function applyCurrency(offers, currency) {
-  return Promise.all(offers.map(async (offer) => {
-    const amount = await convert(offer.price.amount, offer.price.currency, currency);
-    if (amount === null) return offer;
-    return { ...offer, price: { ...offer.price, amount, currency } };
+  const from = offers[0]?.price?.currency;
+  if (!from || from === currency) return offers;
+  const r = await rate(from, currency);
+  if (r === null) return offers;
+  return offers.map((offer) => ({
+    ...offer,
+    price: { ...offer.price, amount: round2(offer.price.amount * r), currency },
   }));
 }
 
@@ -36,9 +45,14 @@ function dedupeByOutbound(offers) {
  * puede significar que la aplicacion se caiga.
  */
 async function search(params) {
-  const { origin, destination, departureDate, returnDate, tripType, travelers, cabinClass, currency } = params;
+  const { origin, destination, departureDate, returnDate, tripType, cabinClass, currency } = params;
+  // El desglose adulto/nino/bebe alimenta al proveedor; el precio por persona
+  // ya sale dividido entre el total de pasajeros en duffel.provider.
+  const adults = params.adults ?? params.travelers ?? 1;
+  const children = params.children ?? 0;
+  const infants = params.infants ?? 0;
   try {
-    const offers = dedupeByOutbound(await duffel.searchOffers({ origin, destination, departureDate, returnDate, travelers, cabinClass, tripType }));
+    const offers = dedupeByOutbound(await duffel.searchOffers({ origin, destination, departureDate, returnDate, adults, children, infants, cabinClass, tripType }));
     return { offers: await applyCurrency(offers, currency), degraded: false };
   } catch (err) {
     logger.warn('Proveedor de vuelos no disponible, se usan datos semilla', { message: err.message });

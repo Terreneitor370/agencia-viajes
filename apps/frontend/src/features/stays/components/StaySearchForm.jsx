@@ -1,6 +1,8 @@
 import { useState } from 'react';
 
-export default function StaySearchForm({ onSearch, loading, defaultCity = '' }) {
+const clamp = (n, min, max) => Math.min(max, Math.max(min, Number.isNaN(n) ? min : n));
+
+export default function StaySearchForm({ onSearch, loading, defaultCity = '', onCurrencyChange }) {
   // Fechas para el input date
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
@@ -29,10 +31,13 @@ export default function StaySearchForm({ onSearch, loading, defaultCity = '' }) 
 
   const handleChange = (e) => {
     const { name, value, type } = e.target;
-    setForm({
-      ...form,
-      [name]: type === 'number' ? parseInt(value) || 0 : value,
+    setForm((prev) => {
+      let nextValue = type === 'number' ? parseInt(value, 10) : value;
+      if (name === 'travelers') nextValue = clamp(nextValue, 1, 20);
+      return { ...prev, [name]: nextValue };
     });
+    // Moneda: se convierte en pantalla sin re-buscar.
+    if (name === 'currency' && onCurrencyChange) onCurrencyChange(value);
   };
 
   return (

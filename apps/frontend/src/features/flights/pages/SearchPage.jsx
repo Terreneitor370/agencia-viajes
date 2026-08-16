@@ -3,6 +3,7 @@
  */
 import { useEffect, useState } from 'react';
 import { flightsApi } from '../api';
+import { getRate, convertList } from '../../../core/api/rates';
 import FlightCard from '../components/FlightCard';
 import Hero from '../../shared/Hero';
 import PopularOptions from '../../shared/PopularOptions';
@@ -15,9 +16,9 @@ const maxDate = new Date(today);
 maxDate.setMonth(maxDate.getMonth() + 11);
 const maxDateStr = maxDate.toISOString().split('T')[0];
 
-const clamp = (n) => Math.min(9, Math.max(1, Number.isNaN(n) ? 1 : n));
+const clamp = (n, min, max) => Math.min(max, Math.max(min, Number.isNaN(n) ? min : n));
 
-const initialForm = { tripType: 'round_trip', origin: '', destination: '', departureDate: '', returnDate: '', travelers: 1, cabinClass: 'economy', currency: 'MXN' };
+const initialForm = { tripType: 'round_trip', origin: '', destination: '', departureDate: '', returnDate: '', adults: 1, children: 0, infants: 0, cabinClass: 'economy', currency: 'MXN', baggageFilter: 'cualquiera' };
 
 const RUTAS = [
   { key: 'mex-cun', origin: 'MEX', destination: 'CUN', label: 'Ciudad de México → Cancún', hint: 'La playa más buscada' },
@@ -42,14 +43,39 @@ export default function SearchPage() {
     return () => { mounted = false; };
   }, []);
 
+  const totalTravelers = form.adults + form.children + form.infants;
+
   const update = (field) => (e) => {
     const value = e.target.value;
     // Al pasar a "solo ida" se limpia la fecha de regreso que ya no aplica.
-    setForm(field === 'tripType'
-      ? { ...form, tripType: value, returnDate: value === 'one_way' ? '' : form.returnDate }
-      : { ...form, [field]: value });
+    setForm((f) => (field === 'tripType'
+      ? { ...f, tripType: value, returnDate: value === 'one_way' ? '' : f.returnDate }
+      : { ...f, [field]: value }));
   };
-  const updateTravelers = (e) => setForm({ ...form, travelers: clamp(parseInt(e.target.value, 10)) });
+
+  const updateCount = (field, min, max) => (e) => {
+    const value = clamp(parseInt(e.target.value, 10), min, max);
+    setForm((f) => {
+      const next = { ...f, [field]: value };
+      return next;
+    });
+  };
+
+  /** Cambiar moneda NUNCA re-busca: convierte los precios en pantalla. */
+  const changeCurrency = async (e) => {
+    const next = e.target.value;
+    setForm((f) => ({ ...f, currency: next }));
+    if (offers.length === 0) return;
+    const from = offers[0].price.currency;
+    if (from === next) return;
+    try {
+      const r = await getRate(from, next);
+      if (r === null) return;
+      setOffers((prev) => convertList(prev, r, next));
+    } catch {
+      // Si falla la conversion se conserva la moneda actual de los resultados.
+    }
+  };
 
   const doSearch = async (payload) => {
     setState({ busy: true, error: '', degraded: false, searched: true });
@@ -65,12 +91,33 @@ export default function SearchPage() {
 
   const onSubmit = (event) => {
     event.preventDefault();
-    doSearch(form);
+    if (totalTravelers < 1 || totalTravelers > 9) return;
+    doSearch({
+      tripType: form.tripType,
+      origin: form.origin,
+      destination: form.destination,
+      departureDate: form.departureDate,
+      returnDate: form.returnDate,
+      adults: form.adults,
+      children: form.children,
+      infants: form.infants,
+      cabinClass: form.cabinClass,
+      currency: form.currency,
+    });
   };
 
   const quickSearch = ({ origin, destination }) => {
-    setForm({ ...form, origin, destination });
+    setForm((f) => ({ ...f, origin, destination }));
   };
+
+  const visibleOffers = offers.filter((offer) => {
+    const checked = offer.baggage?.checked || 0;
+    if (form.baggageFilter === 'con_documentada') return checked > 0;
+    if (form.baggageFilter === 'solo_mano') return checked === 0;
+    return true;
+  });
+
+  const inputCls = 'mt-1 w-full rounded-md border border-bordeInteractivo px-3 py-2 focus:outline-none focus:ring-2 focus:ring-azul-400';
 
   return (
     <div className="min-h-screen bg-lienzo space-y-6 p-4">
@@ -89,11 +136,7 @@ export default function SearchPage() {
         <form onSubmit={onSubmit} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <label className="text-sm">
             <span className="text-tinta-500">Tipo de viaje</span>
-            <select
-              value={form.tripType}
-              onChange={update('tripType')}
-              className="mt-1 w-full rounded-md border border-bordeInteractivo px-3 py-2 focus:outline-none focus:ring-2 focus:ring-azul-400"
-            >
+            <select value={form.tripType} onChange={update('tripType')} className={inputCls}>
               <option value="round_trip">Redondo</option>
               <option value="one_way">Solo ida</option>
             </select>
@@ -107,7 +150,7 @@ export default function SearchPage() {
               list="lista-aeropuertos"
               placeholder="Ej. Ciudad de México o MEX"
               required
-              className="mt-1 w-full rounded-md border border-bordeInteractivo px-3 py-2 focus:outline-none focus:ring-2 focus:ring-azul-400"
+              className={inputCls}
             />
           </label>
 
@@ -119,7 +162,7 @@ export default function SearchPage() {
               list="lista-aeropuertos"
               placeholder="Ej. Cancún o CUN"
               required
-              className="mt-1 w-full rounded-md border border-bordeInteractivo px-3 py-2 focus:outline-none focus:ring-2 focus:ring-azul-400"
+              className={inputCls}
             />
           </label>
 
@@ -132,7 +175,7 @@ export default function SearchPage() {
               min={todayStr}
               max={maxDateStr}
               required
-              className="mt-1 w-full rounded-md border border-bordeInteractivo px-3 py-2 focus:outline-none focus:ring-2 focus:ring-azul-400"
+              className={inputCls}
             />
           </label>
 
@@ -146,20 +189,44 @@ export default function SearchPage() {
                 min={form.departureDate || todayStr}
                 max={maxDateStr}
                 required
-                className="mt-1 w-full rounded-md border border-bordeInteractivo px-3 py-2 focus:outline-none focus:ring-2 focus:ring-azul-400"
+                className={inputCls}
               />
             </label>
           )}
 
           <label className="text-sm">
-            <span className="text-tinta-500">Viajeros (1-9)</span>
+            <span className="text-tinta-500">Adultos (1-9)</span>
             <input
               type="number"
               min={1}
               max={9}
-              value={form.travelers}
-              onChange={updateTravelers}
-              className="mt-1 w-full rounded-md border border-bordeInteractivo px-3 py-2 focus:outline-none focus:ring-2 focus:ring-azul-400"
+              value={form.adults}
+              onChange={updateCount('adults', 1, 9)}
+              className={inputCls}
+            />
+          </label>
+
+          <label className="text-sm">
+            <span className="text-tinta-500">Niños</span>
+            <input
+              type="number"
+              min={0}
+              max={9}
+              value={form.children}
+              onChange={updateCount('children', 0, 9)}
+              className={inputCls}
+            />
+          </label>
+
+          <label className="text-sm">
+            <span className="text-tinta-500">Bebés (sin asiento)</span>
+            <input
+              type="number"
+              min={0}
+              max={9}
+              value={form.infants}
+              onChange={updateCount('infants', 0, 9)}
+              className={inputCls}
             />
           </label>
 
@@ -168,7 +235,7 @@ export default function SearchPage() {
             <select
               value={form.cabinClass}
               onChange={update('cabinClass')}
-              className="mt-1 w-full rounded-md border border-bordeInteractivo px-3 py-2 focus:outline-none focus:ring-2 focus:ring-azul-400"
+              className={inputCls}
             >
               <option value="economy">Económica</option>
               <option value="premium_economy">Económica premium</option>
@@ -178,12 +245,20 @@ export default function SearchPage() {
           </label>
 
           <label className="text-sm">
+            <span className="text-tinta-500">Equipaje</span>
+            <select value={form.baggageFilter} onChange={update('baggageFilter')} className={inputCls}>
+              <option value="cualquiera">Cualquiera</option>
+              <option value="solo_mano">Solo de mano</option>
+              <option value="con_documentada">Con maleta documentada</option>
+            </select>
+            <span className="block mt-1 text-xs text-tinta-400">
+              Los asientos se asignan al reservar.
+            </span>
+          </label>
+
+          <label className="text-sm">
             <span className="text-tinta-500">Moneda</span>
-            <select
-              value={form.currency}
-              onChange={update('currency')}
-              className="mt-1 w-full rounded-md border border-bordeInteractivo px-3 py-2 focus:outline-none focus:ring-2 focus:ring-azul-400"
-            >
+            <select value={form.currency} onChange={changeCurrency} className={inputCls}>
               <option value="MXN">MXN</option>
               <option value="USD">USD</option>
               <option value="EUR">EUR</option>
@@ -195,7 +270,7 @@ export default function SearchPage() {
             disabled={state.busy}
             className="lg:col-span-4 self-start rounded-md bg-azul-600 px-4 py-2 text-sm font-medium text-white hover:bg-azul-700 active:bg-azul-800 disabled:opacity-50"
           >
-            {state.busy ? 'Buscando...' : 'Buscar'}
+            {state.busy ? 'Buscando...' : `Buscar (${totalTravelers} pasajero${totalTravelers === 1 ? '' : 's'})`}
           </button>
         </form>
       </Hero>
@@ -204,7 +279,7 @@ export default function SearchPage() {
         <PopularOptions
           eyebrow="Descubrimiento · Vuelos"
           title="Rutas populares"
-          subtitle="Elige una ruta frecuente para llenar el origen y destino; tú completas fechas y viajeros."
+          subtitle="Elige una ruta frecuente para llenar el origen y destino; tú completas fechas y pasajeros."
           items={RUTAS}
           onPick={quickSearch}
         />
@@ -223,11 +298,16 @@ export default function SearchPage() {
       )}
 
       <section className="grid gap-3">
-        {offers.map((offer) => (
-          <FlightCard key={offer.externalId} offer={offer} travelers={Number(form.travelers)} />
+        {visibleOffers.map((offer) => (
+          <FlightCard key={offer.externalId} offer={offer} travelers={totalTravelers} />
         ))}
-        {state.searched && !state.busy && offers.length === 0 && !state.error && (
+        {state.searched && !state.busy && visibleOffers.length === 0 && !state.error && (
           <p className="text-sm text-tinta-500">No se encontraron vuelos para esos criterios.</p>
+        )}
+        {state.searched && !state.busy && offers.length > 0 && visibleOffers.length === 0 && (
+          <p className="text-sm text-tinta-500">
+            Ningún vuelo de los encontrados tiene ese tipo de equipaje.
+          </p>
         )}
       </section>
     </div>

@@ -58,7 +58,7 @@ function baggageSummary(passengers) {
 }
 
 /** Normaliza la respuesta del proveedor al contrato interno `FlightOffer`. */
-function normalize(offer) {
+function normalize(offer, travelers = 1) {
   const first = offer.slices?.[0] || {};
   const segments = first.segments || [];
   const pax = segments[0]?.passengers?.[0] || {};
@@ -72,7 +72,27 @@ function normalize(offer) {
   if (departureTime && new Date(departureTime) < new Date()) {
     return null; // ← Este vuelo se descartará
   }
-  
+
+  // Duffel total_amount es el TOTAL del grupo; el contrato interno pide POR
+  // PERSONA (asi el total del viaje = precio * viajeros en la UI y el motor
+  // de presupuesto no duplica). viajeros nunca es 0 en una busqueda real.
+  const paxCount = Math.max(Number(travelers) || 1, 1);
+
+  // Escalas: la espera se hace en el aeropuerto donde aterriza cada tramo
+  // (Duffel no manda los "stops" cuando hay conexion, los deduce del arreglo
+  // de segmentos). La hora de escala = salida del siguiente tramo - llegada.
+  const layovers = [];
+  for (let i = 0; i < segments.length - 1; i += 1) {
+    const cur = segments[i];
+    const next = segments[i + 1];
+    const waitMin = Math.round((new Date(next.departing_at) - new Date(cur.arriving_at)) / 60000);
+    layovers.push({
+      city: cur.destination?.city_name || cur.destination?.name || null,
+      iata: cur.destination?.iata_code || null,
+      durationMin: Number.isFinite(waitMin) && waitMin > 0 ? waitMin : null,
+    });
+  }
+
   return {
     provider: 'duffel',
     externalId: offer.id,
@@ -82,11 +102,13 @@ function normalize(offer) {
     departureAt: departureTime ?? null,
     arrivalAt: segments.at(-1)?.arriving_at ?? null,
     stops: Math.max(segments.length - 1, 0),
+    layovers,
     flightNumber: segments[0]?.marketing_carrier_flight_number ?? null,
     aircraft: segments[0]?.aircraft?.name || null,
     durationMin: parseDuration(first.duration),
     originTerminal: segments[0]?.origin_terminal ?? null,
-    destinationTerminal: segments[0]?.destination_terminal ?? null,
+    destinationTerminal: segments.at(-1)?.destination_terminal ?? null,
+    fareBrand: first.fare_brand_name || null,
     baggage: baggageSummary(segments[0]?.passengers),
     cabin: {
       name: cabin.marketing_name || null,
@@ -103,21 +125,24 @@ function normalize(offer) {
     refundable: Boolean(cond.refund_before_departure?.allowed),
     changeable: Boolean(cond.change_before_departure?.allowed),
     tripType: offer.slices.length > 1 ? 'round_trip' : 'one_way',
-    price: { amount: Number(offer.total_amount), currency: offer.total_currency },
+    price: { amount: Math.round((Number(offer.total_amount) / paxCount) * 100) / 100, currency: offer.total_currency },
     // Clave para el motor de presupuesto: el precio de un vuelo es POR PERSONA.
     pricingMode: 'per_person',
   };
 }
 
-async function searchOffers({ origin, destination, departureDate, returnDate, travelers, cabinClass = 'economy', tripType = 'round_trip' }) {
+async function searchOffers({ origin, destination, departureDate, returnDate, adults = 1, children = 0, infants = 0, cabinClass = 'economy', tripType = 'round_trip' }) {
   if (!env.DUFFEL_API_TOKEN) {
     logger.warn('DUFFEL_API_TOKEN sin configurar: se usan datos semilla');
     throw ApiError.upstream('Proveedor de vuelos no configurado');
   }
 
+  // Duffel permite 9 pasajeros; infant_without_seat viaja sin asiento.
+  const total = Math.max(adults + children + infants, 1);
+
   // RF-B-07: cache de respuestas (la busqueda es POST; httpClient solo cachea GET).
   // La version invalida entradas cacheadas con un esquema de oferta anterior.
-  const cacheKey = flightCache.keyOf({ version: 'v2-details', origin, destination, departureDate, returnDate, travelers, cabinClass, tripType });
+  const cacheKey = flightCache.keyOf({ version: 'v4-pax', origin, destination, departureDate, returnDate, adults, children, infants, cabinClass, tripType });
   const cached = await flightCache.get(cacheKey);
   if (cached) {
     logger.debug('Vuelos servidos desde cache', { origin, destination, tripType });
@@ -130,10 +155,16 @@ async function searchOffers({ origin, destination, departureDate, returnDate, tr
     slices.push({ origin: destination, destination: origin, departure_date: returnDate });
   }
 
+  const passengers = [
+    ...Array.from({ length: adults }, () => ({ type: 'adult' })),
+    ...Array.from({ length: children }, () => ({ type: 'child' })),
+    ...Array.from({ length: infants }, () => ({ type: 'infant_without_seat' })),
+  ];
+
   const payload = {
     data: {
       slices,
-      passengers: Array.from({ length: travelers }, () => ({ type: 'adult' })),
+      passengers,
       cabin_class: cabinClass,
     },
   };
@@ -150,7 +181,7 @@ async function searchOffers({ origin, destination, departureDate, returnDate, tr
 
   // 🔧 CORREGIDO: Normalizar y filtrar vuelos que ya salieron
   const offers = raw.data.offers
-    .map(normalize)          // Normalizar cada oferta
+    .map((offer) => normalize(offer, total)) // Normalizar cada oferta
     .filter(offer => offer !== null); // Eliminar los que ya salieron
 
   await flightCache.set(cacheKey, offers);

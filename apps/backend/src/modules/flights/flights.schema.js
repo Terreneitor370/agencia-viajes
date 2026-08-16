@@ -23,7 +23,12 @@ const searchFlightsSchema = z.object({
   departureDate: windowDate,
   returnDate: optionalWindowDate.optional(),
   tripType: z.enum(['round_trip', 'one_way']).default('round_trip'),
-  travelers: z.coerce.number().int().min(1, 'Minimo 1 viajero').max(9, 'Maximo 9 viajeros').default(1),
+  // Viajeros: se descompone en adultos/niños/bebes. `travelers` (total) se
+  // mantiene para compatibilidad; si llega `adults`, ese es el que manda.
+  travelers: z.coerce.number().int().min(1, 'Minimo 1 viajero').max(9, 'Maximo 9 viajeros').optional(),
+  adults: z.coerce.number().int().min(1, 'Minimo 1 adulto').max(9, 'Maximo 9 adultos').optional(),
+  children: z.coerce.number().int().min(0).max(9, 'Maximo 9 niños').default(0),
+  infants: z.coerce.number().int().min(0).max(9, 'Maximo 9 bebes').default(0),
   cabinClass: z.enum(['economy', 'premium_economy', 'business', 'first']).default('economy'),
   currency: z.enum(CURRENCIES).default('MXN'),
 }).strict()
@@ -35,6 +40,9 @@ const searchFlightsSchema = z.object({
   })
   .refine((v) => !v.returnDate || v.returnDate >= v.departureDate, {
     message: 'La fecha de regreso no puede ser anterior a la salida', path: ['returnDate'],
+  })
+  .refine((v) => v.adults === undefined || v.adults + v.children + v.infants <= 9, {
+    message: 'El grupo no puede superar 9 pasajeros', path: ['adults'],
   });
 
 module.exports = { searchFlightsSchema };
