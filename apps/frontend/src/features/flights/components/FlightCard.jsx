@@ -34,16 +34,29 @@ export default function FlightCard({ offer, travelers = 1 }) {
   const wifi = offer.cabin?.wifi;
   const seat = offer.cabin?.seat;
   const layovers = (offer.layovers || []).map(layoverText).filter(Boolean);
+  const ret = offer.return || null;
+  const retLayovers = ret ? (ret.layovers || []).map(layoverText).filter(Boolean) : [];
 
   return (
     <article className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
         <p className="font-medium">{offer.airline}</p>
+
         <p className="text-sm text-slate-500">
           {offer.origin} → {offer.destination} · {offer.stops === 0 ? 'Directo' : `${offer.stops} escala(s)`}
         </p>
         <p className="mt-1 text-xs text-slate-400">{time(offer.departureAt)}</p>
-        <span className="inline-block mt-1 text-xs border border-bordeFuerte px-2 py-0.5 rounded text-tinta-700">
+
+        {ret && (
+          <div className="mt-2 pt-2 border-t border-slate-100">
+            <p className="text-sm text-slate-500">
+              {ret.origin} → {ret.destination} · {ret.stops === 0 ? 'Directo' : `${ret.stops} escala(s)`}
+            </p>
+            <p className="mt-1 text-xs text-slate-400">{time(ret.departureAt)}</p>
+          </div>
+        )}
+
+        <span className="inline-block mt-2 text-xs border border-bordeFuerte px-2 py-0.5 rounded text-tinta-700">
           {offer.tripType === 'round_trip' ? 'Redondo' : 'Solo ida'}
         </span>
 
@@ -51,6 +64,13 @@ export default function FlightCard({ offer, travelers = 1 }) {
           <Detail label="Vuelo" value={[offer.flightNumber, offer.aircraft].filter(Boolean).join(' · ')} />
           <Detail label="Duración" value={duration(offer.durationMin)} />
           <Detail label="Escala" value={layovers.length ? layovers.join(' · ') : null} />
+          {ret && (
+            <>
+              <Detail label="Vuelo regreso" value={[ret.flightNumber, ret.aircraft].filter(Boolean).join(' · ')} />
+              <Detail label="Duración regreso" value={duration(ret.durationMin)} />
+              <Detail label="Escala regreso" value={retLayovers.length ? retLayovers.join(' · ') : null} />
+            </>
+          )}
           <Detail
             label="Terminales"
             value={offer.originTerminal != null && offer.destinationTerminal != null

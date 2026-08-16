@@ -65,9 +65,9 @@ function normalize(offer, travelers = 1) {
   const cabin = pax.cabin || {};
   const cond = offer.conditions || {};
   
-  // Obtener la hora de salida
+  // Obtener la hora de salida del tramo de ida
   const departureTime = segments[0]?.departing_at;
-  
+
   // 🔧 FILTRO: Si el vuelo ya salió, lo marcamos como no disponible
   if (departureTime && new Date(departureTime) < new Date()) {
     return null; // ← Este vuelo se descartará
@@ -78,15 +78,30 @@ function normalize(offer, travelers = 1) {
   // de presupuesto no duplica). viajeros nunca es 0 en una busqueda real.
   const paxCount = Math.max(Number(travelers) || 1, 1);
 
-  // Escalas: la espera se hace en el aeropuerto donde aterriza cada tramo
-  // (Duffel no manda los "stops" cuando hay conexion, los deduce del arreglo
-  // de segmentos). La hora de escala = salida del siguiente tramo - llegada.
+  // Escalas del tramo de ida: la espera se hace en el aeropuerto donde
+  // aterriza cada tramo (Duffel no manda los "stops" cuando hay conexion,
+  // los deduce del arreglo de segmentos).
   const layovers = [];
   for (let i = 0; i < segments.length - 1; i += 1) {
     const cur = segments[i];
     const next = segments[i + 1];
     const waitMin = Math.round((new Date(next.departing_at) - new Date(cur.arriving_at)) / 60000);
     layovers.push({
+      city: cur.destination?.city_name || cur.destination?.name || null,
+      iata: cur.destination?.iata_code || null,
+      durationMin: Number.isFinite(waitMin) && waitMin > 0 ? waitMin : null,
+    });
+  }
+
+  // Tramo de regreso (solo viajes redondos con 2 slices)
+  const secondSlice = offer.slices?.[1] || null;
+  const returnSegments = secondSlice?.segments || [];
+  const returnLayovers = [];
+  for (let i = 0; i < returnSegments.length - 1; i += 1) {
+    const cur = returnSegments[i];
+    const next = returnSegments[i + 1];
+    const waitMin = Math.round((new Date(next.departing_at) - new Date(cur.arriving_at)) / 60000);
+    returnLayovers.push({
       city: cur.destination?.city_name || cur.destination?.name || null,
       iata: cur.destination?.iata_code || null,
       durationMin: Number.isFinite(waitMin) && waitMin > 0 ? waitMin : null,
@@ -125,6 +140,20 @@ function normalize(offer, travelers = 1) {
     refundable: Boolean(cond.refund_before_departure?.allowed),
     changeable: Boolean(cond.change_before_departure?.allowed),
     tripType: offer.slices.length > 1 ? 'round_trip' : 'one_way',
+    // Tramo de regreso (solo viajes redondos)
+    return: secondSlice ? {
+      origin: returnSegments[0]?.origin?.iata_code ?? null,
+      destination: returnSegments.at(-1)?.destination?.iata_code ?? null,
+      departureAt: returnSegments[0]?.departing_at ?? null,
+      arrivalAt: returnSegments.at(-1)?.arriving_at ?? null,
+      stops: Math.max(returnSegments.length - 1, 0),
+      layovers: returnLayovers,
+      durationMin: parseDuration(secondSlice.duration),
+      originTerminal: returnSegments[0]?.origin_terminal ?? null,
+      destinationTerminal: returnSegments.at(-1)?.destination_terminal ?? null,
+      flightNumber: returnSegments[0]?.marketing_carrier_flight_number ?? null,
+      aircraft: returnSegments[0]?.aircraft?.name || null,
+    } : null,
     price: { amount: Math.round((Number(offer.total_amount) / paxCount) * 100) / 100, currency: offer.total_currency },
     // Clave para el motor de presupuesto: el precio de un vuelo es POR PERSONA.
     pricingMode: 'per_person',
