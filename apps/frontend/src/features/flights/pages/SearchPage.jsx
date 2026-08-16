@@ -276,11 +276,6 @@ export default function SearchPage() {
           >
             {state.busy ? 'Buscando en el proveedor...' : `Buscar (${totalTravelers} pasajero${totalTravelers === 1 ? '' : 's'})`}
           </button>
-          {state.busy && (
-            <p className="text-xs text-tinta-500 lg:col-span-4">
-              La primera búsqueda tarda unos segundos; el resultado queda guardado en caché.
-            </p>
-          )}
         </form>
       </Hero>
 

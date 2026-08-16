@@ -4,9 +4,6 @@ export default function StayResults({ stays, loading, metadata, searched }) {
   if (loading) {
     return (
       <div className="space-y-3" aria-busy="true" aria-live="polite">
-        <p className="text-sm text-tinta-500">
-          Buscando hospedajes... La primera búsqueda tarda unos segundos; el resultado queda guardado en caché.
-        </p>
         <div className="grid gap-3">
           {[0, 1, 2].map((i) => (
             <div key={i} className="animate-pulse rounded-md border border-borde bg-superficie p-4">
