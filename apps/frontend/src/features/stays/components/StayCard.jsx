@@ -13,7 +13,7 @@ const FACILITY_LABELS = {
   gym: 'Gimnasio',
 };
 
-export default function StayCard({ stay }) {
+export default function StayCard({ stay, nights }) {
   const { image, loading: imageLoading } = useStayImage(stay);
 
   const formatPrice = (amount, currency) =>
@@ -27,6 +27,8 @@ export default function StayCard({ stay }) {
   const price = stay.price || { amount: 0, currency: 'MXN', estimated: true };
   const pricePerNight = price.amount || 0;
   const currency = price.currency || 'MXN';
+  const totalNights = Number(nights) || 1;
+  const totalStay = pricePerNight * totalNights;
 
   // Si hay imagen, úsala; si no, usa un placeholder con color
   const displayImage = image;
@@ -64,10 +66,15 @@ export default function StayCard({ stay }) {
           <div className="shrink-0 text-right">
             <p className="text-base font-semibold text-ambar-700 sm:text-lg">
               {formatPrice(pricePerNight, currency)}
+              <span className="text-[11px] font-normal text-tinta-500"> /noche</span>
             </p>
-            <p className="text-[11px] text-tinta-500">por noche</p>
+            {totalNights > 1 && (
+              <p className="text-xs text-tinta-700">
+                Total {totalNights} noches: <strong>{formatPrice(totalStay, currency)}</strong>
+              </p>
+            )}
             {price.estimated && (
-              <p className="text-[10px] text-tinta-400">⚡ estimado</p>
+              <p className="text-[10px] text-tinta-400">estimado</p>
             )}
           </div>
         </div>

@@ -41,7 +41,7 @@ export default function StayResults({ stays, loading, metadata, searched }) {
 
       <div className="grid gap-3">
         {stays.map((stay, index) => (
-          <StayCard key={stay.externalId || index} stay={stay} />
+          <StayCard key={stay.externalId || index} stay={stay} nights={metadata.nights} />
         ))}
       </div>
     </section>
