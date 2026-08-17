@@ -1,6 +1,11 @@
 /** DUENO: Isa (modulo A). */
 import { useState } from 'react';
 import { useNavigate, useLocation, useSearchParams, Link } from 'react-router-dom';
+import Boton from '../../../components/ui/Boton';
+import Campo from '../../../components/ui/Campo';
+import CampoContrasena from '../components/CampoContrasena';
+import PasoCodigoOtp from '../components/PasoCodigoOtp';
+import Tarjeta from '../../../components/ui/Tarjeta';
 import { useAuth } from '../../../core/auth/useAuth';
 import { authApi } from '../api';
 
@@ -15,8 +20,20 @@ const OAUTH_ERROR_MESSAGES = {
   fallo: 'No fue posible iniciar sesion con Google. Intenta de nuevo.',
 };
 
+/** Logotipo oficial de Google a 4 colores. Solo se usa aqui, por eso vive local. */
+function LogoGoogle() {
+  return (
+    <svg viewBox="0 0 18 18" width="18" height="18" aria-hidden="true">
+      <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" />
+      <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.583-5.036-3.71H.957v2.332A8.997 8.997 0 0 0 9 18z" />
+      <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" />
+      <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" />
+    </svg>
+  );
+}
+
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, verifyOtp } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -26,14 +43,22 @@ export default function LoginPage() {
     return motivo ? (OAUTH_ERROR_MESSAGES[motivo] || OAUTH_ERROR_MESSAGES.fallo) : '';
   });
   const [busy, setBusy] = useState(false);
+  const [ayudaContrasena, setAyudaContrasena] = useState(false);
+  const [challengeId, setChallengeId] = useState(null);
+
+  const irA = location.state?.from?.pathname || '/viajes';
 
   const onSubmit = async (event) => {
     event.preventDefault();
     setBusy(true);
     setError('');
     try {
-      await login(form);
-      navigate(location.state?.from?.pathname || '/viajes', { replace: true });
+      const resultado = await login(form);
+      if (resultado?.mfaRequired) {
+        setChallengeId(resultado.challengeId);
+      } else {
+        navigate(irA, { replace: true });
+      }
     } catch (err) {
       // Se muestra el mensaje generico del backend. No detallamos si fallo el
       // correo o la contrasena: eso permitiria enumerar cuentas validas.
@@ -43,45 +68,82 @@ export default function LoginPage() {
     }
   };
 
+  if (challengeId) {
+    return (
+      <PasoCodigoOtp
+        challengeId={challengeId}
+        correo={form.email}
+        verifyOtp={verifyOtp}
+        onExito={() => navigate(irA, { replace: true })}
+        onVolver={() => setChallengeId(null)}
+      />
+    );
+  }
+
   return (
-    <div className="mx-auto max-w-sm rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-      <h1 className="text-xl font-semibold">Iniciar sesion</h1>
+    <div className="flex min-h-[70vh] items-center justify-center">
+      <Tarjeta comoElemento="form" onSubmit={onSubmit} className="mx-auto w-full max-w-sm p-6">
+        <h1 className="text-seccion text-tinta-900">Iniciar sesion</h1>
 
-      <form onSubmit={onSubmit} className="mt-5 space-y-4">
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium text-slate-700">Correo</label>
-          <input id="email" type="email" required autoComplete="email"
-            value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none" />
+        <div className="mt-5 space-y-4">
+          <Campo
+            etiqueta="Correo"
+            type="email"
+            name="email"
+            autoComplete="email"
+            value={form.email}
+            onChange={(event) => setForm({ ...form, email: event.target.value })}
+            required
+          />
+
+          <div>
+            <CampoContrasena
+              etiqueta="Contraseña"
+              name="password"
+              autoComplete="current-password"
+              value={form.password}
+              onChange={(event) => setForm({ ...form, password: event.target.value })}
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setAyudaContrasena((v) => !v)}
+              className="mt-1.5 text-menor font-semibold text-azul-600 hover:underline"
+            >
+              ¿Olvidaste tu contraseña?
+            </button>
+            {ayudaContrasena && (
+              <p className="mt-1.5 text-menor text-tinta-500">
+                Por ahora no hay recuperacion automatica por correo. Pide a un administrador que revise tu cuenta.
+              </p>
+            )}
+          </div>
+
+          {error && (
+            <p role="alert" className="rounded-md bg-criticoSuave px-3 py-2 text-menor text-critico">{error}</p>
+          )}
+
+          <Boton type="submit" variante="primario" anchoCompleto cargando={busy}>
+            Iniciar sesion
+          </Boton>
         </div>
 
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium text-slate-700">Contrasena</label>
-          <input id="password" type="password" required autoComplete="current-password"
-            value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })}
-            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none" />
+        <div className="my-4 flex items-center gap-3 text-menor text-tinta-300">
+          <span className="h-px flex-1 bg-borde" /> o <span className="h-px flex-1 bg-borde" />
         </div>
 
-        {error && <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+        <a
+          href={authApi.googleUrl()}
+          className="flex h-11 w-full items-center justify-center gap-2.5 rounded-md border border-bordeInteractivo bg-superficie text-cuerpo font-semibold text-tinta-900 transition-colors hover:bg-lienzo"
+        >
+          <LogoGoogle />
+          Continuar con Google
+        </a>
 
-        <button type="submit" disabled={busy}
-          className="w-full rounded-md bg-sky-600 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50">
-          {busy ? 'Entrando...' : 'Entrar'}
-        </button>
-      </form>
-
-      <div className="my-4 flex items-center gap-3 text-xs text-slate-400">
-        <span className="h-px flex-1 bg-slate-200" /> o <span className="h-px flex-1 bg-slate-200" />
-      </div>
-
-      <a href={authApi.googleUrl()}
-        className="block w-full rounded-md border border-slate-300 py-2 text-center text-sm font-medium hover:bg-slate-50">
-        Continuar con Google
-      </a>
-
-      <p className="mt-5 text-center text-sm text-slate-500">
-        No tienes cuenta? <Link to="/registro" className="text-sky-700 hover:underline">Registrate</Link>
-      </p>
+        <p className="mt-5 text-center text-cuerpo text-tinta-500">
+          ¿No tienes cuenta? <Link to="/registro" className="font-semibold text-azul-600 hover:underline">Registrate</Link>
+        </p>
+      </Tarjeta>
     </div>
   );
 }

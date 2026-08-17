@@ -38,6 +38,15 @@ const changePasswordSchema = z.object({
   newPassword: password,
 }).strict();
 
+const verifyOtpSchema = z.object({
+  challengeId: z.string().uuid(),
+  code: z.string().regex(/^\d{6}$/, 'El codigo debe tener 6 digitos'),
+}).strict();
+
+const resendOtpSchema = z.object({
+  challengeId: z.string().uuid(),
+}).strict();
+
 // Sin .strict(): esto no es un formulario que llena nuestro usuario, es un
 // redirect que arma Google. Google agrega parametros propios (tipicamente
 // `scope`) que no controlamos; rechazarlos tumbaba un login valido con
@@ -50,7 +59,7 @@ const googleCallbackSchema = z.object({
 });
 
 module.exports = {
-  registerSchema, loginSchema, changePasswordSchema, googleCallbackSchema,
+  registerSchema, loginSchema, changePasswordSchema, googleCallbackSchema, verifyOtpSchema, resendOtpSchema,
   // Se reexporta porque modules/users/users.routes.js necesita el mismo
   // patron para el nombre en la edicion de perfil: un solo lugar donde vive
   // la regla, nunca dos copias que se puedan desalinear.

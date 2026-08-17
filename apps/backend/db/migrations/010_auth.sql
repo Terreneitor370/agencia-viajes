@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS users (
   home_city           VARCHAR(80)   NULL,
   preferred_currency  ENUM('MXN','USD','EUR') NOT NULL DEFAULT 'MXN',
   avatar_url          VARCHAR(255)  NULL,
+  -- NULL hasta que se verifica con el mismo desafio OTP de login_otp_challenges
+  -- (al registrarse o, si no se completo entonces, en el primer login exitoso).
+  email_verified_at   DATETIME      NULL,
   failed_attempts     TINYINT UNSIGNED NOT NULL DEFAULT 0,
   locked_until        DATETIME      NULL,
   password_changed_at DATETIME      NULL,
@@ -74,4 +77,26 @@ CREATE TABLE IF NOT EXISTS audit_log (
   -- opcional que sobrevive al actor. ON DELETE SET NULL, nunca CASCADE: la
   -- bitacora no puede perder el rastro solo porque el usuario se elimino.
   CONSTRAINT fk_audit_actor FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- Codigo de un solo uso por correo (RF-A extendido, agosto 2026). Se abre al
+-- registrarse (para confirmar que el correo es de quien se registro) y,
+-- solo si esa verificacion nunca se completo, tambien en el siguiente login
+-- con password correcto. Una cuenta ya verificada entra solo con
+-- credenciales, el codigo no se vuelve a pedir. El codigo nunca se guarda en
+-- claro: va con bcrypt (igual que password_hash), NO sha256 como
+-- refresh_tokens. Con solo 1,000,000 de combinaciones posibles un hash
+-- rapido se rompe por fuerza bruta fuera de linea en milisegundos.
+CREATE TABLE IF NOT EXISTS login_otp_challenges (
+  id           CHAR(36)     NOT NULL PRIMARY KEY,
+  user_id      CHAR(36)     NOT NULL,
+  code_hash    VARCHAR(72)  NOT NULL,
+  attempts     TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  expires_at   DATETIME     NOT NULL,
+  consumed_at  DATETIME     NULL,
+  created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_otp_user (user_id),
+  -- Soporta el mismo tipo de job de purga que refresh_tokens.
+  KEY idx_otp_expires (expires_at),
+  CONSTRAINT fk_otp_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;

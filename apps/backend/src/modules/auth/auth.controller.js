@@ -18,15 +18,34 @@ const setSessionCookies = (res, session) => {
 };
 
 exports.register = async (req, res) => {
-  const user = await service.register(req.body, req);
-  return respond.created(res, { user });
+  const resultado = await service.register(req.body, req);
+  // Igual que login: la cuenta ya existe, pero todavia falta el codigo que
+  // confirma que el correo es de quien se registro. Sin cookies todavia.
+  return respond.created(res, resultado);
 };
 
 exports.login = async (req, res) => {
-  const session = await service.login(req.body, req);
-  setSessionCookies(res, session);
+  const resultado = await service.login(req.body, req);
+  // Password correcto pero falta el codigo del segundo factor: todavia no
+  // hay cookies que poner. Nunca se manda el challengeId por otro canal, va
+  // en el cuerpo de esta misma respuesta porque el frontend lo necesita ya
+  // para pintar la pantalla del codigo.
+  if (resultado.mfaRequired) return respond.ok(res, resultado);
+
+  setSessionCookies(res, resultado);
   // El access token tambien va en el cuerpo para poder probar con Postman/ZAP.
+  return respond.ok(res, { user: resultado.user, accessToken: resultado.accessToken });
+};
+
+exports.verifyOtp = async (req, res) => {
+  const session = await service.verifyOtp(req.body.challengeId, req.body.code, req);
+  setSessionCookies(res, session);
   return respond.ok(res, { user: session.user, accessToken: session.accessToken });
+};
+
+exports.resendOtp = async (req, res) => {
+  const resultado = await service.resendOtp(req.body.challengeId, req);
+  return respond.ok(res, resultado);
 };
 
 exports.refresh = async (req, res) => {

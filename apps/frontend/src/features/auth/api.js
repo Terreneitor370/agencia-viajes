@@ -2,8 +2,15 @@
 import { api } from '../../core/api/client';
 
 export const authApi = {
+  // register() puede devolver { mfaRequired: true, challengeId }: la cuenta
+  // ya existe, pero falta confirmar el correo antes de dar por completado el
+  // registro. Mismo mecanismo que el segundo factor de login (ver abajo).
   register: (payload) => api.post('/auth/register', payload),
   login: (payload) => api.post('/auth/login', payload),
+  // La verificacion del codigo vive en useAuth().verifyOtp: ese wrapper carga
+  // la sesion despues del 200, igual que hace login(). El reenvio no crea
+  // sesion, por eso llama la API directo sin pasar por AuthProvider.
+  resendOtp: (payload) => api.post('/auth/otp/resend', payload),
   logout: () => api.post('/auth/logout'),
   me: () => api.get('/auth/me'),
   changePassword: (payload) => api.post('/auth/change-password', payload),

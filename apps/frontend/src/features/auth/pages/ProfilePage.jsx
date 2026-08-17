@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import Boton from '../../../components/ui/Boton';
 import Campo from '../../../components/ui/Campo';
 import Tarjeta from '../../../components/ui/Tarjeta';
+import CampoContrasena from '../components/CampoContrasena';
+import ChecklistContrasena from '../components/ChecklistContrasena';
 import { ApiError } from '../../../core/api/client';
 import { useAuth } from '../../../core/auth/useAuth';
 import { authApi, usersApi } from '../api';
@@ -87,7 +89,7 @@ export default function ProfilePage() {
       await logout();
       navigate('/login', { replace: true });
     } catch (err) {
-      setErrorPass(err.message || 'No fue posible cambiar la contrasena');
+      setErrorPass(err.message || 'No fue posible cambiar la contraseña');
     } finally {
       setCambiandoPass(false);
     }
@@ -148,37 +150,35 @@ export default function ProfilePage() {
       </Tarjeta>
 
       <Tarjeta comoElemento="form" onSubmit={onSubmitPassword} className="p-6">
-        <h2 className="text-tarjeta text-tinta-900">Cambiar contrasena</h2>
+        <h2 className="text-tarjeta text-tinta-900">Cambiar contraseña</h2>
         <p className="mt-1 text-menor text-tinta-500">Al terminar, cerramos tu sesion en todos tus dispositivos.</p>
 
         <div className="mt-4 space-y-4">
-          <Campo
-            etiqueta="Contrasena actual"
-            type="password"
+          <CampoContrasena
+            etiqueta="Contraseña actual"
             autoComplete="current-password"
             value={passForm.currentPassword}
             onChange={(event) => setPassForm((f) => ({ ...f, currentPassword: event.target.value }))}
             required
           />
-          <Campo
-            etiqueta="Contrasena nueva"
-            ayuda={`minimo ${LONGITUD_MINIMA_CONTRASENA} caracteres`}
-            type="password"
-            autoComplete="new-password"
-            value={passForm.newPassword}
-            onChange={(event) => setPassForm((f) => ({ ...f, newPassword: event.target.value }))}
-            error={nuevaContrasena.comun ? 'Es una contrasena muy comun, elige otra' : undefined}
-            contador={`${nuevaContrasena.longitud} de ${LONGITUD_MINIMA_CONTRASENA}${nuevaContrasena.cumple ? ' ✓' : ''}`}
-            minLength={LONGITUD_MINIMA_CONTRASENA}
-            maxLength={128}
-            required
-          />
+          <div>
+            <CampoContrasena
+              etiqueta="Contraseña nueva"
+              autoComplete="new-password"
+              value={passForm.newPassword}
+              onChange={(event) => setPassForm((f) => ({ ...f, newPassword: event.target.value }))}
+              minLength={LONGITUD_MINIMA_CONTRASENA}
+              maxLength={128}
+              required
+            />
+            <ChecklistContrasena contrasena={nuevaContrasena} />
+          </div>
 
           {errorPass && (
             <p role="alert" className="rounded-md bg-criticoSuave px-3 py-2 text-menor text-critico">{errorPass}</p>
           )}
 
-          <Boton type="submit" variante="secundario" cargando={cambiandoPass}>Cambiar contrasena</Boton>
+          <Boton type="submit" variante="secundario" cargando={cambiandoPass}>Cambiar contraseña</Boton>
         </div>
       </Tarjeta>
     </div>
