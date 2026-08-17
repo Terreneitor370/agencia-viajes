@@ -33,6 +33,21 @@ const schema = z.object({
   CORS_ORIGINS: z.string().default('http://localhost:5173'),
   FRONTEND_URL: z.string().default('http://localhost:5173'),
 
+  // SMTP (segundo factor por correo, modulo A). Opcional con default vacio,
+  // mismo criterio que Google OAuth: si falta, la funcion se apaga con un
+  // mensaje claro en vez de tumbar el arranque del servidor.
+  SMTP_HOST: z.string().default(''),
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  // OJO: NO usar z.coerce.boolean() aqui. Coerce.boolean hace Boolean(valor),
+  // y todo lo que llega de process.env es string: Boolean("false") da true.
+  // Con eso el transporte pedia TLS implicito en el puerto 587 (que espera
+  // STARTTLS), y el sintoma era "wrong version number" en cada envio.
+  SMTP_SECURE: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+  SMTP_USER: z.string().default(''),
+  SMTP_PASSWORD: z.string().default(''),
+  SMTP_FROM: z.string().default('Viaja <no-responder@viaja.local>'),
+  OTP_TTL_MINUTES: z.coerce.number().int().positive().default(10),
+
   // APIs externas (SOLO backend: nunca exponer en el frontend)
   DUFFEL_API_TOKEN: z.string().default(''),
   DUFFEL_API_VERSION: z.string().default('v2'),

@@ -7,8 +7,9 @@
 const crypto = require('node:crypto');
 const service = require('./auth.service');
 const tokens = require('./auth.tokens');
+const { googleCallbackSchema } = require('./auth.schema');
 const respond = require('../../core/respond');
-const ApiError = require('../../core/ApiError');
+const logger = require('../../core/logger');
 const env = require('../../config/env');
 
 const setSessionCookies = (res, session) => {
@@ -17,15 +18,34 @@ const setSessionCookies = (res, session) => {
 };
 
 exports.register = async (req, res) => {
-  const user = await service.register(req.body, req);
-  return respond.created(res, { user });
+  const resultado = await service.register(req.body, req);
+  // Igual que login: la cuenta ya existe, pero todavia falta el codigo que
+  // confirma que el correo es de quien se registro. Sin cookies todavia.
+  return respond.created(res, resultado);
 };
 
 exports.login = async (req, res) => {
-  const session = await service.login(req.body, req);
-  setSessionCookies(res, session);
+  const resultado = await service.login(req.body, req);
+  // Password correcto pero falta el codigo del segundo factor: todavia no
+  // hay cookies que poner. Nunca se manda el challengeId por otro canal, va
+  // en el cuerpo de esta misma respuesta porque el frontend lo necesita ya
+  // para pintar la pantalla del codigo.
+  if (resultado.mfaRequired) return respond.ok(res, resultado);
+
+  setSessionCookies(res, resultado);
   // El access token tambien va en el cuerpo para poder probar con Postman/ZAP.
+  return respond.ok(res, { user: resultado.user, accessToken: resultado.accessToken });
+};
+
+exports.verifyOtp = async (req, res) => {
+  const session = await service.verifyOtp(req.body.challengeId, req.body.code, req);
+  setSessionCookies(res, session);
   return respond.ok(res, { user: session.user, accessToken: session.accessToken });
+};
+
+exports.resendOtp = async (req, res) => {
+  const resultado = await service.resendOtp(req.body.challengeId, req);
+  return respond.ok(res, resultado);
 };
 
 exports.refresh = async (req, res) => {
@@ -60,7 +80,13 @@ exports.changePassword = async (req, res) => {
  * (login CSRF).
  */
 exports.googleStart = async (req, res) => {
-  if (!env.GOOGLE_CLIENT_ID) throw ApiError.badRequest('OAuth con Google no esta configurado');
+  // Es un <a href>, no un fetch: si esto tirara un error normal, el navegador
+  // saldria de la SPA a enseñar el JSON crudo. Mejor mandarlo de vuelta al
+  // login con el mismo mecanismo de oauth_error que ya usa el callback.
+  if (!env.GOOGLE_CLIENT_ID) {
+    logger.security('OAUTH_GOOGLE_NOT_CONFIGURED', {});
+    return res.redirect(`${env.FRONTEND_URL}/login?oauth_error=no_configurado`);
+  }
   const state = crypto.randomBytes(24).toString('base64url');
   const verifier = crypto.randomBytes(32).toString('base64url'); // PKCE
   const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
@@ -80,10 +106,50 @@ exports.googleStart = async (req, res) => {
   return res.redirect(url.toString());
 };
 
-exports.googleCallback = async (_req, _res) => {
-  // TODO(A): 1) comparar req.query.state con la cookie oauth_state (rechazar si difiere)
-  //          2) canjear el codigo en oauth2.googleapis.com con el code_verifier
-  //          3) verificar el id_token y exigir email_verified === true
-  //          4) service.issueSession(...) y redirigir a env.FRONTEND_URL
-  throw ApiError.internal('Callback de Google pendiente de implementar');
+/**
+ * Retorno de Google. Es una navegacion completa del navegador, no un fetch:
+ * por eso CADA salida de esta funcion es un redirect, nunca un JSON de error
+ * (el usuario terminaria viendo el JSON crudo en la barra de direcciones).
+ */
+const oauthCookiePath = { path: '/api/v1/auth' };
+const loginWithError = (res, motivo) => res.redirect(`${env.FRONTEND_URL}/login?oauth_error=${motivo}`);
+
+exports.googleCallback = async (req, res) => {
+  const clearOAuthCookies = () => {
+    res.clearCookie('oauth_state', oauthCookiePath);
+    res.clearCookie('oauth_verifier', oauthCookiePath);
+  };
+
+  // Google manda `error` (sin `code`) cuando el usuario cancela en su pantalla
+  // de consentimiento. No es una falla nuestra: se distingue del resto.
+  if (req.query.error) {
+    clearOAuthCookies();
+    return loginWithError(res, 'denegado');
+  }
+
+  const parsed = googleCallbackSchema.safeParse(req.query);
+  if (!parsed.success) {
+    logger.warn('Callback de Google con query invalido', { issues: parsed.error.issues.map((i) => i.path.join('.')) });
+    clearOAuthCookies();
+    return loginWithError(res, 'solicitud_invalida');
+  }
+
+  const { code, state } = parsed.data;
+  const savedState = req.cookies?.oauth_state;
+  const verifier = req.cookies?.oauth_verifier;
+  clearOAuthCookies(); // de un solo uso, se consumen aqui pase lo que pase
+
+  if (!savedState || !verifier || state !== savedState) {
+    logger.security('OAUTH_STATE_MISMATCH', { ip: req.ip, hasState: Boolean(savedState) });
+    return loginWithError(res, 'estado_invalido');
+  }
+
+  try {
+    const session = await service.googleExchange(code, verifier, req);
+    setSessionCookies(res, session);
+    return res.redirect(env.FRONTEND_URL);
+  } catch (err) {
+    logger.security('OAUTH_GOOGLE_FAILED', { message: err.message });
+    return loginWithError(res, 'fallo');
+  }
 };

@@ -16,6 +16,13 @@ const router = Router();
 
 router.post('/register', authLimiter, validate({ body: schemas.registerSchema }), asyncHandler(controller.register));
 router.post('/login', authLimiter, validate({ body: schemas.loginSchema }), asyncHandler(controller.login));
+// Un solo par de rutas para los dos casos que abren un desafio de codigo
+// (verificar correo al registrarse, o retomarlo en el login si esa
+// verificacion nunca se completo): el challengeId ya dice de cual se trata,
+// no hace falta duplicar el endpoint. authLimiter (por IP) es ademas de los
+// 5 intentos por desafio que ya cuenta login_otp_challenges.attempts.
+router.post('/otp/verify', authLimiter, validate({ body: schemas.verifyOtpSchema }), asyncHandler(controller.verifyOtp));
+router.post('/otp/resend', authLimiter, validate({ body: schemas.resendOtpSchema }), asyncHandler(controller.resendOtp));
 router.post('/refresh', authLimiter, asyncHandler(controller.refresh));
 router.post('/logout', authenticate, asyncHandler(controller.logout));
 router.get('/me', authenticate, asyncHandler(controller.me));
@@ -41,7 +48,11 @@ const openapiPaths = {
           },
         } } },
       },
-      responses: { 201: { description: 'Usuario creado' }, 400: { description: 'Datos invalidos' }, 429: { $ref: '#/components/responses/RateLimited' } },
+      responses: {
+        201: { description: 'Usuario creado, junto con { mfaRequired: true, challengeId } para confirmar el correo en /otp/verify' },
+        400: { description: 'Datos invalidos' },
+        429: { $ref: '#/components/responses/RateLimited' },
+      },
     },
   },
   '/login': {
@@ -54,7 +65,37 @@ const openapiPaths = {
           properties: { email: { type: 'string', format: 'email' }, password: { type: 'string' } },
         } } },
       },
+      responses: {
+        200: { description: 'Sesion iniciada, o { mfaRequired: true, challengeId } si la cuenta nunca confirmo el correo del registro' },
+        401: { $ref: '#/components/responses/Unauthorized' },
+        429: { $ref: '#/components/responses/RateLimited' },
+      },
+    },
+  },
+  '/otp/verify': {
+    post: {
+      tags: ['auth'], summary: 'Verifica el codigo (de registro o de login) y emite la sesion', security: [],
+      requestBody: {
+        required: true,
+        content: { 'application/json': { schema: {
+          type: 'object', required: ['challengeId', 'code'],
+          properties: { challengeId: { type: 'string', format: 'uuid' }, code: { type: 'string', pattern: '^\\d{6}$' } },
+        } } },
+      },
       responses: { 200: { description: 'Sesion iniciada' }, 401: { $ref: '#/components/responses/Unauthorized' }, 429: { $ref: '#/components/responses/RateLimited' } },
+    },
+  },
+  '/otp/resend': {
+    post: {
+      tags: ['auth'], summary: 'Cancela el codigo vigente y envia uno nuevo', security: [],
+      requestBody: {
+        required: true,
+        content: { 'application/json': { schema: {
+          type: 'object', required: ['challengeId'],
+          properties: { challengeId: { type: 'string', format: 'uuid' } },
+        } } },
+      },
+      responses: { 200: { description: 'Nuevo codigo enviado' }, 401: { $ref: '#/components/responses/Unauthorized' }, 429: { $ref: '#/components/responses/RateLimited' } },
     },
   },
   '/me': {
@@ -62,6 +103,42 @@ const openapiPaths = {
   },
   '/logout': {
     post: { tags: ['auth'], summary: 'Cerrar sesion', responses: { 204: { description: 'Sesion cerrada' } } },
+  },
+  '/refresh': {
+    post: {
+      tags: ['auth'], summary: 'Renueva la sesion con el refresh token de la cookie', security: [],
+      responses: { 200: { description: 'Sesion renovada' }, 401: { $ref: '#/components/responses/Unauthorized' }, 429: { $ref: '#/components/responses/RateLimited' } },
+    },
+  },
+  '/change-password': {
+    post: {
+      tags: ['auth'], summary: 'Cambia la contrasena e invalida el resto de las sesiones',
+      requestBody: {
+        required: true,
+        content: { 'application/json': { schema: {
+          type: 'object', required: ['currentPassword', 'newPassword'],
+          properties: { currentPassword: { type: 'string' }, newPassword: { type: 'string', minLength: 12 } },
+        } } },
+      },
+      responses: { 204: { description: 'Contrasena actualizada' }, 401: { $ref: '#/components/responses/Unauthorized' } },
+    },
+  },
+  '/google': {
+    get: {
+      tags: ['auth'], summary: 'Inicia el flujo OAuth con Google (Authorization Code + PKCE)', security: [],
+      responses: { 302: { description: 'Redirige a Google, o a /login?oauth_error=no_configurado si el servidor no tiene credenciales' } },
+    },
+  },
+  '/google/callback': {
+    get: {
+      tags: ['auth'], summary: 'Retorno de Google: canjea el code, verifica el id_token y emite sesion', security: [],
+      parameters: [
+        { name: 'code', in: 'query', schema: { type: 'string' } },
+        { name: 'state', in: 'query', schema: { type: 'string' } },
+        { name: 'error', in: 'query', schema: { type: 'string' } },
+      ],
+      responses: { 302: { description: 'Redirige al frontend, con sesion iniciada o con ?oauth_error=... si algo fallo' } },
+    },
   },
 };
 
