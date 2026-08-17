@@ -33,13 +33,21 @@ router.get('/users', authorize(P.USER_READ_ANY), validate({ query: listQuery }),
     const { page, pageSize, q } = req.query;
     // LIKE parametrizado: el comodin se arma en JS, nunca dentro del SQL.
     const term = q ? `%${q}%` : '%';
+    // LIMIT/OFFSET van como literal, no como `?`: MySQL rechaza placeholders ahi
+    // en modo prepared statement (execute() truena con ER_WRONG_ARGUMENTS).
+    // Es seguro porque page/pageSize ya vienen coercionados a entero acotado
+    // por Zod (listQuery) antes de llegar aqui, nunca texto libre del usuario.
+    const limit = Number(pageSize);
+    const offset = Number(page - 1) * limit;
     const rows = await db.query(
       `SELECT id, name, email, role, status, created_at, last_login_at
          FROM users WHERE (name LIKE ? OR email LIKE ?)
-         ORDER BY created_at DESC LIMIT ? OFFSET ?`,
-      [term, term, pageSize, (page - 1) * pageSize],
+         ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`,
+      [term, term],
     );
-    const [{ total }] = await db.query('SELECT COUNT(*) AS total FROM users');
+    const [{ total }] = await db.query(
+      'SELECT COUNT(*) AS total FROM users WHERE (name LIKE ? OR email LIKE ?)', [term, term],
+    );
     return respond.paginated(res, rows, { page, pageSize, total });
   }));
 
@@ -60,13 +68,22 @@ router.patch('/users/:id/role', authorize(P.USER_UPDATE_ROLE), writeLimiter,
 
 router.get('/audit', authorize(P.AUDIT_READ), validate({ query: listQuery }),
   asyncHandler(async (req, res) => {
-    const { page, pageSize } = req.query;
+    const { page, pageSize, q } = req.query;
+    // Filtro por accion, mismo patron LIKE parametrizado que /users.
+    const term = q ? `%${q}%` : '%';
+    // Mismo motivo que en /users: LIMIT/OFFSET como literal, no como `?`.
+    const limit = Number(pageSize);
+    const offset = Number(page - 1) * limit;
     const rows = await db.query(
-      `SELECT id, actor_id, action, entity, entity_id, ip, correlation_id, created_at
-         FROM audit_log ORDER BY created_at DESC LIMIT ? OFFSET ?`,
-      [pageSize, (page - 1) * pageSize],
+      `SELECT audit_log.id, audit_log.actor_id, users.name AS actor_name, users.email AS actor_email,
+              audit_log.action, audit_log.entity, audit_log.entity_id, audit_log.ip,
+              audit_log.correlation_id, audit_log.created_at
+         FROM audit_log LEFT JOIN users ON users.id = audit_log.actor_id
+         WHERE audit_log.action LIKE ?
+         ORDER BY audit_log.created_at DESC LIMIT ${limit} OFFSET ${offset}`,
+      [term],
     );
-    const [{ total }] = await db.query('SELECT COUNT(*) AS total FROM audit_log');
+    const [{ total }] = await db.query('SELECT COUNT(*) AS total FROM audit_log WHERE action LIKE ?', [term]);
     return respond.paginated(res, rows, { page, pageSize, total });
   }));
 

@@ -9,11 +9,11 @@
  */
 const db = require('../../core/db');
 
-const PUBLIC_COLUMNS = 'id, name, email, role, status, avatar_url, created_at';
+const PUBLIC_COLUMNS = 'id, name, email, role, status, avatar_url, email_verified_at, created_at';
 
 module.exports = {
   findByEmail: (email) => db.queryOne(
-    `SELECT id, name, email, role, status, password_hash, google_sub, failed_attempts, locked_until
+    `SELECT id, name, email, role, status, password_hash, google_sub, failed_attempts, locked_until, email_verified_at
      FROM users WHERE email = ? LIMIT 1`,
     [email],
   ),
@@ -69,5 +69,38 @@ module.exports = {
 
   updatePassword: (id, passwordHash) => db.query(
     'UPDATE users SET password_hash = ?, password_changed_at = NOW() WHERE id = ?', [passwordHash, id],
+  ),
+
+  /** Idempotente: no pisa la fecha si ya se habia verificado antes. */
+  markEmailVerified: (id) => db.query(
+    'UPDATE users SET email_verified_at = NOW() WHERE id = ? AND email_verified_at IS NULL', [id],
+  ),
+
+  createOtpChallenge: ({ id, userId, codeHash, expiresAt }) => db.query(
+    'INSERT INTO login_otp_challenges (id, user_id, code_hash, expires_at) VALUES (?, ?, ?, ?)',
+    [id, userId, codeHash, expiresAt],
+  ),
+
+  findOtpChallenge: (id) => db.queryOne(
+    `SELECT id, user_id, code_hash, attempts, expires_at, consumed_at
+       FROM login_otp_challenges WHERE id = ? LIMIT 1`,
+    [id],
+  ),
+
+  incrementOtpAttempts: (id) => db.query(
+    'UPDATE login_otp_challenges SET attempts = attempts + 1 WHERE id = ?', [id],
+  ),
+
+  consumeOtpChallenge: (id) => db.query(
+    'UPDATE login_otp_challenges SET consumed_at = NOW() WHERE id = ?', [id],
+  ),
+
+  /**
+   * "Consumido" tambien cubre "reemplazado por uno nuevo": se llama al abrir
+   * un desafio nuevo para no dejar codigos viejos todavia validos sueltos.
+   */
+  invalidateOtpChallengesForUser: (userId) => db.query(
+    'UPDATE login_otp_challenges SET consumed_at = NOW() WHERE user_id = ? AND consumed_at IS NULL',
+    [userId],
   ),
 };

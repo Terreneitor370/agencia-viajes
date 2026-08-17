@@ -52,7 +52,17 @@ export default function AuthProvider({ children }) {
   }, []);
 
   const login = useCallback(async (credentials) => {
-    await api.post('/auth/login', credentials);
+    const { data } = await api.post('/auth/login', credentials);
+    // Password correcto pero falta el codigo del segundo factor: todavia no
+    // hay sesion que cargar. LoginPage decide que hacer con challengeId.
+    if (data?.mfaRequired) return data;
+    await loadSession();
+    return data;
+  }, [loadSession]);
+
+  /** Completa el login o el registro con el codigo enviado por correo. */
+  const verifyOtp = useCallback(async (challengeId, code) => {
+    await api.post('/auth/otp/verify', { challengeId, code });
     await loadSession();
   }, [loadSession]);
 
@@ -69,9 +79,10 @@ export default function AuthProvider({ children }) {
     isAuthenticated: Boolean(user),
     can: (permission) => permissions.includes(permission),
     login,
+    verifyOtp,
     logout,
     reload: loadSession,
-  }), [user, permissions, loading, login, logout, loadSession]);
+  }), [user, permissions, loading, login, verifyOtp, logout, loadSession]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
