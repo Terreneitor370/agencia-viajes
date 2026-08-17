@@ -83,6 +83,11 @@ async function searchPlaces({ categories, lat, lon, radiusMeters = 8000, limit =
       lat: p.lat,
       lon: p.lon,
       website: typeof p.website === 'string' ? p.website : null,
+      phone: p.contact?.phone || null,
+      email: p.contact?.email || null,
+      facilities: p.facilities || {},
+      stars: p.accommodation?.stars ?? null,
+      rooms: p.accommodation?.rooms ?? null,
       // Geoapify NO entrega precios. El precio se estima en el modulo de
       // presupuesto a partir de categoria + destino. Ver budget.engine.js.
       price: null,
