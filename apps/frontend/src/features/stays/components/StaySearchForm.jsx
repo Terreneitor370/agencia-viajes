@@ -22,11 +22,17 @@ export default function StaySearchForm({ onSearch, loading, defaultCity = '', on
     currency: 'MXN',
   });
 
+  const [dateError, setDateError] = useState('');
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (form.city && form.checkIn && form.checkOut) {
-      onSearch(form);
+    if (!form.city || !form.checkIn || !form.checkOut) return;
+    if (form.checkIn && form.checkOut && form.checkOut <= form.checkIn) {
+      setDateError('La fecha de salida debe ser posterior a la de llegada');
+      return;
     }
+    setDateError('');
+    onSearch(form);
   };
 
   const handleChange = (e) => {
@@ -34,7 +40,10 @@ export default function StaySearchForm({ onSearch, loading, defaultCity = '', on
     setForm((prev) => {
       let nextValue = type === 'number' ? parseInt(value, 10) : value;
       if (name === 'travelers') nextValue = clamp(nextValue, 1, 20);
-      return { ...prev, [name]: nextValue };
+      const next = { ...prev, [name]: nextValue };
+      // Limpiar error de fechas cuando cambian las fechas
+      if ((name === 'checkIn' || name === 'checkOut') && dateError) setDateError('');
+      return next;
     });
     // Moneda: se convierte en pantalla sin re-buscar.
     if (name === 'currency' && onCurrencyChange) onCurrencyChange(value);
@@ -121,6 +130,9 @@ export default function StaySearchForm({ onSearch, loading, defaultCity = '', on
       >
         {loading ? 'Buscando...' : 'Buscar hospedaje'}
       </button>
+      {dateError && (
+        <p className="sm:col-span-2 lg:col-span-6 text-xs text-critico">{dateError}</p>
+      )}
     </form>
   );
 }

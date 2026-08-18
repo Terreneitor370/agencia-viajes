@@ -28,7 +28,12 @@ export function useStays() {
       });
       return response;
     } catch (err) {
-      setError(err.message || 'Error al buscar hospedaje');
+      // Si el backend manda detalles de campo (ej. "La salida debe ser posterior
+      // a la entrada"), mostramos el primero; si no, el mensaje generico.
+      const fieldMsg = Array.isArray(err.details) && err.details.length > 0
+        ? err.details[0].message
+        : null;
+      setError(fieldMsg || err.message || 'Error al buscar hospedaje');
       setStays([]);
       setMetadata({});
     } finally {

@@ -1,6 +1,6 @@
 import StayCard from './StayCard';
 
-export default function StayResults({ stays, loading, metadata, searched }) {
+export default function StayResults({ stays, loading, metadata, searched, error }) {
   if (loading) {
     return (
       <div className="space-y-3" aria-busy="true" aria-live="polite">
@@ -20,6 +20,7 @@ export default function StayResults({ stays, loading, metadata, searched }) {
     if (!searched) {
       return null;
     }
+    if (error) return null;
     return (
       <p className="text-sm text-tinta-500 text-center py-12">
         No se encontraron hospedajes para esos criterios.
