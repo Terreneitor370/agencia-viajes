@@ -80,7 +80,6 @@ const AIRPORTS = [
   { city: 'aruba', name: 'Aeropuerto Internacional Reina Beatrix', iata: 'AUA', country: 'AW' },
   { city: 'san juan', name: 'Aeropuerto Internacional Luis Munoz Marin', iata: 'SJU', country: 'PR' },
   { city: 'san jose', name: 'Aeropuerto Internacional Juan Santamaria', iata: 'SJO', country: 'CR', alias: ['costa rica'] },
-  { city: 'panama', name: 'Aeropuerto Internacional de Tocumen', iata: 'PTY', country: 'PA', alias: ['ciudad de panama'] },
   { city: 'shanghai', name: 'Aeropuerto Internacional de Pudong', iata: 'PVG', country: 'CN' },
   { city: 'tokio', name: 'Aeropuerto Internacional de Narita', iata: 'NRT', country: 'JP', alias: ['tokyo'] },
 ];

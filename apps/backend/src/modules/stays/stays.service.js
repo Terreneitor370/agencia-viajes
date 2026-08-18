@@ -80,6 +80,10 @@ async function search({ city, countryCode, checkIn, checkOut, travelers, radiusK
       degraded: false,
     };
   } catch (err) {
+    // Si la ciudad no existe (404 del geocoder), propagamos el error
+    // especifico para que el frontend muestre "ciudad no encontrada"
+    // en vez del generico "proveedor no disponible".
+    if (err.status === 404) throw err;
     logger.warn('Proveedor de hospedaje no disponible', { message: err.message });
     return {
       location: null,

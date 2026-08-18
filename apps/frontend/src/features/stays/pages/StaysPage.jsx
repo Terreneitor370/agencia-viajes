@@ -61,7 +61,7 @@ export default function StaysPage() {
         </p>
       )}
 
-      <StayResults stays={stays} loading={loading} metadata={metadata} searched={searched} />
+      <StayResults stays={stays} loading={loading} metadata={metadata} searched={searched} error={error} />
     </div>
   );
 }
