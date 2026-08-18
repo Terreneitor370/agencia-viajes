@@ -11,11 +11,18 @@ const COLUMNS = `id, user_id, title, origin_city, destination_city, start_date, 
                  travelers, currency, budget_limit, status, created_at, updated_at`;
 
 module.exports = {
-  listByUser: (userId, { limit = 20, offset = 0 }) => db.query(
-    `SELECT ${COLUMNS} FROM trips WHERE user_id = ? AND deleted_at IS NULL
-      ORDER BY created_at DESC LIMIT ? OFFSET ?`,
-    [userId, limit, offset],
-  ),
+  listByUser: (userId, { limit = 20, offset = 0 }) => {
+    // MySQL en modo prepared statement falla con LIMIT/OFFSET parametrizado
+    // (ER_WRONG_ARGUMENTS). Se inyectan como literales DESPUES de validar.
+    const safeLimit = Math.max(1, Math.min(50, Number(limit) || 20));
+    const safeOffset = Math.max(0, Number(offset) || 0);
+
+    return db.query(
+      `SELECT ${COLUMNS} FROM trips WHERE user_id = ? AND deleted_at IS NULL
+      ORDER BY created_at DESC LIMIT ${safeLimit} OFFSET ${safeOffset}`,
+      [userId],
+    );
+  },
 
   /** Solo devuelve el viaje si pertenece al usuario. */
   findByIdForUser: (id, userId) => db.queryOne(
@@ -34,6 +41,28 @@ module.exports = {
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [trip.id, trip.userId, trip.title, trip.originCity, trip.destinationCity,
       trip.startDate, trip.endDate, trip.travelers, trip.currency, trip.budgetLimit],
+  ),
+
+  update: (id, userId, trip) => db.query(
+    `UPDATE trips
+       SET title = ?, origin_city = ?, destination_city = ?,
+           start_date = ?, end_date = ?, travelers = ?,
+           currency = ?, budget_limit = ?, status = ?,
+           updated_at = NOW()
+     WHERE id = ? AND user_id = ? AND deleted_at IS NULL`,
+    [
+      trip.title,
+      trip.originCity,
+      trip.destinationCity,
+      trip.startDate,
+      trip.endDate,
+      trip.travelers,
+      trip.currency,
+      trip.budgetLimit,
+      trip.status,
+      id,
+      userId,
+    ],
   ),
 
   updateTravelers: (id, userId, travelers) => db.query(
@@ -59,6 +88,11 @@ module.exports = {
     [item.id, item.tripId, item.type, item.provider, item.externalId, item.title,
       item.unitPriceCents, item.currency, item.pricingMode, item.quantity, item.estimated,
       item.meta ? JSON.stringify(item.meta) : null],
+  ),
+
+  updateItemQuantity: (itemId, tripId, quantity) => db.query(
+    'UPDATE trip_items SET quantity = ? WHERE id = ? AND trip_id = ?',
+    [quantity, itemId, tripId],
   ),
 
   removeItem: (itemId, tripId) => db.query(

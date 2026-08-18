@@ -1,13 +1,14 @@
 const { z } = require('zod');
 
 const uuid = z.string().uuid();
+const ymdDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 const createTripSchema = z.object({
   title: z.string().trim().min(3).max(120),
   originCity: z.string().trim().min(2).max(80),
   destinationCity: z.string().trim().min(2).max(80),
-  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  startDate: ymdDate,
+  endDate: ymdDate,
   travelers: z.coerce.number().int().min(1).max(20),
   currency: z.enum(['MXN', 'USD', 'EUR']).default('MXN'),
   budgetLimit: z.coerce.number().min(0).max(10_000_000).nullable().default(null),
@@ -36,6 +37,36 @@ const addTripItemSchema = z.object({
   meta: z.record(z.string(), z.unknown()).nullable().default(null),
 }).strict();
 
-const tripIdParam = z.object({ id: uuid }).strict();
+const updateTripSchema = z.object({
+  title: z.string().trim().min(3).max(120).optional(),
+  originCity: z.string().trim().min(2).max(80).optional(),
+  destinationCity: z.string().trim().min(2).max(80).optional(),
+  startDate: ymdDate.optional(),
+  endDate: ymdDate.optional(),
+  travelers: z.coerce.number().int().min(1).max(20).optional(),
+  currency: z.enum(['MXN', 'USD', 'EUR']).optional(),
+  budgetLimit: z.coerce.number().min(0).max(10_000_000).nullable().optional(),
+  status: z.enum(['draft', 'planned', 'archived']).optional(),
+}).strict()
+  .refine((v) => Object.keys(v).length > 0, {
+    message: 'Debes enviar al menos un campo para actualizar',
+  })
+  .refine((v) => !v.startDate || !v.endDate || new Date(v.endDate) > new Date(v.startDate), {
+    message: 'La fecha de regreso debe ser posterior a la de salida', path: ['endDate'],
+  });
 
-module.exports = { createTripSchema, addTripItemSchema, tripIdParam };
+const updateTripItemSchema = z.object({
+  quantity: z.coerce.number().int().min(1).max(50),
+}).strict();
+
+const tripIdParam = z.object({ id: uuid }).strict();
+const tripItemParam = z.object({ id: uuid, itemId: uuid }).strict();
+
+module.exports = {
+  createTripSchema,
+  addTripItemSchema,
+  updateTripSchema,
+  updateTripItemSchema,
+  tripIdParam,
+  tripItemParam,
+};
