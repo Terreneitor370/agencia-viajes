@@ -3,7 +3,7 @@
  * Contrato: exportar por defecto un arreglo de rutas de react-router.
  */
 import { lazy, Suspense } from 'react';
-import { ProtectedRoute } from '../../core/guards/ProtectedRoute';
+import { ProtectedRoute, GuestRoute } from '../../core/guards/ProtectedRoute';
 
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
@@ -17,8 +17,8 @@ const load = (Component) => (
 );
 
 export default [
-  { path: 'login', element: load(LoginPage) },
-  { path: 'registro', element: load(RegisterPage) },
-  { path: 'olvide-password', element: load(ForgotPasswordPage) },
+  { path: 'login', element: <GuestRoute>{load(LoginPage)}</GuestRoute> },
+  { path: 'registro', element: <GuestRoute>{load(RegisterPage)}</GuestRoute> },
+  { path: 'olvide-password', element: <GuestRoute>{load(ForgotPasswordPage)}</GuestRoute> },
   { path: 'perfil', element: <ProtectedRoute>{load(ProfilePage)}</ProtectedRoute> },
 ];
