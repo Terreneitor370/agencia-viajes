@@ -56,7 +56,7 @@ function CardForm({ clientSecret, orderId, totalCents, currency, onDone }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="rounded-md border border-bordeInteractivo p-3">
-        <CardElement options={CARD_STYLE} />
+        <CardElement options={CARD_STYLE} hidePostalCode />
       </div>
       {error && <p className="text-menor text-critico text-center">{error}</p>}
       <button
