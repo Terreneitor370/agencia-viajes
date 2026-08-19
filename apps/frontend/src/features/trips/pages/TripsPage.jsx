@@ -39,6 +39,8 @@ const normalizeTrip = (row) => ({
   budgetLimit: row.budget_limit ?? row.budgetLimit ?? null,
 });
 
+const PAGE_SIZE = 20;
+
 function initialForm() {
   const startDate = toInputDate(new Date());
   return {
@@ -137,6 +139,8 @@ function TripCard({ trip, budget, onOpen }) {
 export default function TripsPage() {
   const navigate = useNavigate();
   const [trips, setTrips] = useState([]);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ page: 1, pageSize: PAGE_SIZE, total: 0, pages: 1 });
   const [budgetsByTrip, setBudgetsByTrip] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -152,10 +156,20 @@ export default function TripsPage() {
       setLoading(true);
       setError('');
       try {
-        const res = await tripsApi.list({ page: 1, pageSize: 20 });
+        const res = await tripsApi.list({ page, pageSize: PAGE_SIZE });
         const rows = Array.isArray(res.data) ? res.data.map(normalizeTrip) : [];
+        const nextPagination = res.pagination || {};
+        const total = Number(nextPagination.total || 0);
+        const pages = Math.max(1, Number(nextPagination.pages || Math.ceil(total / PAGE_SIZE) || 1));
+
         if (cancelled) return;
         setTrips(rows);
+        setPagination({
+          page: Number(nextPagination.page || page),
+          pageSize: Number(nextPagination.pageSize || PAGE_SIZE),
+          total,
+          pages,
+        });
 
         const budgetEntries = await Promise.all(rows.map(async (trip) => {
           try {
@@ -171,6 +185,7 @@ export default function TripsPage() {
         if (cancelled) return;
         setError(err.message || 'No fue posible cargar tus viajes.');
         setTrips([]);
+        setPagination({ page: 1, pageSize: PAGE_SIZE, total: 0, pages: 1 });
         setBudgetsByTrip({});
       } finally {
         if (!cancelled) setLoading(false);
@@ -181,12 +196,12 @@ export default function TripsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [page]);
 
   const stats = useMemo(() => {
-    const activos = trips.length;
+    const activos = pagination.total;
     return `${activos} ${activos === 1 ? 'viaje activo' : 'viajes activos'}`;
-  }, [trips.length]);
+  }, [pagination.total]);
 
   const onForm = (field) => (event) => {
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
@@ -282,6 +297,32 @@ export default function TripsPage() {
               onOpen={() => navigate(`/viajes/${trip.id}`)}
             />
           ))}
+
+          {!loading && !error && pagination.pages > 1 && (
+            <div className="flex items-center justify-between gap-3 rounded-md border border-borde bg-superficie px-3 py-2">
+              <p className="text-menor text-tinta-500">
+                Pagina {pagination.page} de {pagination.pages}
+              </p>
+              <div className="flex items-center gap-2">
+                <Boton
+                  variante="secundario"
+                  tamano="sm"
+                  onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                  disabled={pagination.page <= 1}
+                >
+                  Anterior
+                </Boton>
+                <Boton
+                  variante="secundario"
+                  tamano="sm"
+                  onClick={() => setPage((prev) => Math.min(pagination.pages, prev + 1))}
+                  disabled={pagination.page >= pagination.pages}
+                >
+                  Siguiente
+                </Boton>
+              </div>
+            </div>
+          )}
         </div>
 
         <Tarjeta className="p-4" id="crear-viaje">

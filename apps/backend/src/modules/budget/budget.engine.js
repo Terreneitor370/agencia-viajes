@@ -23,7 +23,30 @@
  */
 const PRICING_MODES = ['per_person', 'per_group', 'per_night_per_room', 'per_person_per_day'];
 
-const toCents = (amount) => Math.round(Number(amount) * 100);
+const DEFAULT_CONTINGENCY_RATE = 0.10;
+
+/** Convierte dinero decimal a centavos sin arrastrar error binario de floats. */
+function moneyToCents(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const text = String(value).trim();
+  if (!text) return null;
+
+  const match = text.match(/^([+-]?)(\d+)(?:\.(\d+))?$/);
+  if (!match) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? Math.round(numeric * 100) : null;
+  }
+
+  const sign = match[1] === '-' ? -1 : 1;
+  const units = Number(match[2]);
+  const decimals = (match[3] || '');
+  const firstTwo = Number((decimals + '00').slice(0, 2));
+  const third = Number((decimals + '000').charAt(2));
+
+  return sign * (units * 100 + firstTwo + (third >= 5 ? 1 : 0));
+}
+
+const toCents = (amount) => moneyToCents(amount) ?? 0;
 const toMoney = (cents) => Math.round(cents) / 100;
 
 /**
@@ -56,7 +79,7 @@ function itemSubtotalCents(item, trip) {
  * @returns {{ byCategory: object, subtotal: number, contingency: number, total: number,
  *             perPerson: number, currency: string, overBudget: boolean }}
  */
-function computeBudget({ items = [], trip, contingencyRate = 0.10, currency = 'MXN', budgetLimit = null }) {
+function computeBudget({ items = [], trip, contingencyRate = DEFAULT_CONTINGENCY_RATE, currency = 'MXN', budgetLimit = null }) {
   const byCategoryCents = { flight: 0, stay: 0, experience: 0, other: 0 };
 
   for (const item of items) {
@@ -69,18 +92,28 @@ function computeBudget({ items = [], trip, contingencyRate = 0.10, currency = 'M
   const contingencyCents = Math.round(subtotalCents * contingencyRate);
   const totalCents = subtotalCents + contingencyCents;
   const travelers = Math.max(1, trip.travelers ?? 1);
+  const budgetLimitCents = moneyToCents(budgetLimit);
 
   return {
     currency,
+    contingencyRate,
     byCategory: Object.fromEntries(Object.entries(byCategoryCents).map(([k, v]) => [k, toMoney(v)])),
     subtotal: toMoney(subtotalCents),
     contingency: toMoney(contingencyCents),
     total: toMoney(totalCents),
     perPerson: toMoney(totalCents / travelers),
-    budgetLimit,
-    overBudget: budgetLimit != null && toMoney(totalCents) > budgetLimit,
-    remaining: budgetLimit != null ? toMoney(budgetLimit * 100 - totalCents) : null,
+    budgetLimit: budgetLimitCents != null ? toMoney(budgetLimitCents) : null,
+    overBudget: budgetLimitCents != null && totalCents > budgetLimitCents,
+    remaining: budgetLimitCents != null ? toMoney(budgetLimitCents - totalCents) : null,
   };
 }
 
-module.exports = { PRICING_MODES, toCents, toMoney, itemSubtotalCents, computeBudget };
+module.exports = {
+  PRICING_MODES,
+  DEFAULT_CONTINGENCY_RATE,
+  toCents,
+  toMoney,
+  moneyToCents,
+  itemSubtotalCents,
+  computeBudget,
+};

@@ -7,7 +7,7 @@ const authorize = require('../../middlewares/authorize');
 const asyncHandler = require('../../core/asyncHandler');
 const respond = require('../../core/respond');
 const { PERMISSIONS: P } = require('../../config/roles');
-const { computeBudget } = require('./budget.engine');
+const { computeBudget, DEFAULT_CONTINGENCY_RATE } = require('./budget.engine');
 
 const router = Router();
 
@@ -15,7 +15,7 @@ const simulateSchema = z.object({
   travelers: z.coerce.number().int().min(1).max(20),
   nights: z.coerce.number().int().min(1).max(90),
   rooms: z.coerce.number().int().min(1).max(10).optional(),
-  contingencyRate: z.coerce.number().min(0).max(0.5).default(0.10),
+  contingencyRate: z.coerce.number().min(0).max(0.5).default(DEFAULT_CONTINGENCY_RATE),
   budgetLimit: z.coerce.number().min(0).max(10_000_000).nullable().default(null),
   items: z.array(z.object({
     type: z.enum(['flight', 'stay', 'experience', 'other']),
