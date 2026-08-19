@@ -21,14 +21,28 @@ export default function CheckoutSuccessPage() {
       return;
     }
     let cancelled = false;
-    paymentsApi.orderBySession(sessionId)
-      .then((res) => { if (!cancelled) setOrder(res.data); })
-      .catch((err) => { if (!cancelled) setError(err.message); })
-      .finally(() => { if (!cancelled) setLoading(false); });
+    let attempts = 0;
+    const maxAttempts = 10;
+
+    const fetchOrder = () => {
+      paymentsApi.orderBySession(sessionId)
+        .then((res) => {
+          if (cancelled) return;
+          setOrder(res.data);
+          if (res.data.status === 'pending' && attempts < maxAttempts) {
+            attempts++;
+            setTimeout(fetchOrder, 2000);
+          }
+        })
+        .catch((err) => { if (!cancelled) setError(err.message); })
+        .finally(() => { if (!cancelled) setLoading(false); });
+    };
+
+    fetchOrder();
     return () => { cancelled = true; };
   }, [sessionId]);
 
-  if (loading) {
+  if (loading && !order) {
     return (
       <Tarjeta className="p-8 text-center">
         <p className="text-tinta-500">Verificando pago...</p>
@@ -62,10 +76,10 @@ export default function CheckoutSuccessPage() {
         </>
       ) : (
         <>
-          <div className="text-4xl">&#9888;</div>
+          <div className="text-4xl">&#9203;</div>
           <h1 className="text-seccion text-ambar-600">Pago pendiente</h1>
           <p className="text-cuerpo text-tinta-700">
-            Tu pago esta siendo procesado. Te notificaremos cuando se confirme.
+            Tu pago esta siendo procesado. Esta pagina se actualiza automaticamente.
           </p>
         </>
       )}

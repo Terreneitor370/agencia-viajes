@@ -150,6 +150,7 @@ async function handleWebhook(rawBody, signature) {
 
 /**
  * Consulta el estado de una orden.
+ * Sincroniza con Stripe si la orden sigue pending.
  */
 async function getOrderStatus(orderId, userId) {
   const order = await db.queryOne(
@@ -157,11 +158,32 @@ async function getOrderStatus(orderId, userId) {
     [orderId, userId],
   );
   if (!order) throw ApiError.notFound('Orden no encontrada');
+
+  if (order.status === 'pending' && order.stripe_session_id) {
+    try {
+      const session = await stripe.checkout.sessions.retrieve(order.stripe_session_id);
+      if (session.payment_status === 'paid') {
+        await db.query(
+          "UPDATE orders SET status = 'paid', stripe_payment_intent = ? WHERE id = ? AND status = 'pending'",
+          [session.payment_intent, order.id],
+        );
+        order.status = 'paid';
+        order.stripe_payment_intent = session.payment_intent;
+      } else if (session.status === 'expired') {
+        await db.query("UPDATE orders SET status = 'failed' WHERE id = ? AND status = 'pending'", [order.id]);
+        order.status = 'failed';
+      }
+    } catch (err) {
+      logger.warn('No se pudo sincronizar estado con Stripe', { orderId: order.id, error: err.message });
+    }
+  }
+
   return order;
 }
 
 /**
  * Consulta el estado de una orden por session_id de Stripe.
+ * Sincroniza con Stripe si la orden sigue pending (para cuando el webhook no llego).
  */
 async function getOrderBySession(sessionId, userId) {
   const order = await db.queryOne(
@@ -169,6 +191,26 @@ async function getOrderBySession(sessionId, userId) {
     [sessionId, userId],
   );
   if (!order) throw ApiError.notFound('Orden no encontrada');
+
+  if (order.status === 'pending' && order.stripe_session_id) {
+    try {
+      const session = await stripe.checkout.sessions.retrieve(order.stripe_session_id);
+      if (session.payment_status === 'paid') {
+        await db.query(
+          "UPDATE orders SET status = 'paid', stripe_payment_intent = ? WHERE id = ? AND status = 'pending'",
+          [session.payment_intent, order.id],
+        );
+        order.status = 'paid';
+        order.stripe_payment_intent = session.payment_intent;
+      } else if (session.status === 'expired') {
+        await db.query("UPDATE orders SET status = 'failed' WHERE id = ? AND status = 'pending'", [order.id]);
+        order.status = 'failed';
+      }
+    } catch (err) {
+      logger.warn('No se pudo sincronizar estado con Stripe', { orderId: order.id, error: err.message });
+    }
+  }
+
   return order;
 }
 
