@@ -61,18 +61,18 @@ function Breakdown({ budget, currency }) {
   );
 }
 
-function TravelersControl({ travelers, onChange, busy }) {
+function TravelersControl({ travelers, onChange, busy, disabled }) {
   return (
     <div>
       <div className="flex items-center justify-between gap-3">
-        <p className="text-menor font-semibold text-tinta-700">Viajeros</p>
+        <p className="text-menor font-semibold text-tinta-700">Viajeros{disabled ? ' (viaje pagado)' : ''}</p>
         <div className="flex h-9 items-center gap-2 rounded-md border border-bordeInteractivo px-2">
           <button
             type="button"
             onClick={() => onChange(travelers - 1)}
-            className="h-6 w-6 rounded border border-borde text-tinta-700 hover:bg-lienzo"
+            className="h-6 w-6 rounded border border-borde text-tinta-700 hover:bg-lienzo disabled:opacity-40"
             aria-label="Disminuir viajeros"
-            disabled={busy}
+            disabled={busy || disabled}
           >
             -
           </button>
@@ -80,9 +80,9 @@ function TravelersControl({ travelers, onChange, busy }) {
           <button
             type="button"
             onClick={() => onChange(travelers + 1)}
-            className="h-6 w-6 rounded border border-borde text-tinta-700 hover:bg-lienzo"
+            className="h-6 w-6 rounded border border-borde text-tinta-700 hover:bg-lienzo disabled:opacity-40"
             aria-label="Aumentar viajeros"
-            disabled={busy}
+            disabled={busy || disabled}
           >
             +
           </button>
@@ -94,7 +94,7 @@ function TravelersControl({ travelers, onChange, busy }) {
         min={1}
         max={20}
         value={travelers}
-        disabled={busy}
+        disabled={busy || disabled}
         onChange={(event) => onChange(event.target.value)}
         className="mt-2 h-2 w-full cursor-pointer appearance-none rounded-full bg-lienzo accent-azul-600 disabled:cursor-not-allowed"
       />
@@ -156,7 +156,7 @@ function BudgetContent({ budget, travelers, onChangeTravelers, busy, tripId, cur
         <p className="text-menor text-tinta-500">{dinero(budget?.perPerson, currency)} por persona</p>
       </header>
 
-      <TravelersControl travelers={travelers} onChange={onChangeTravelers} busy={busy} />
+      <TravelersControl travelers={travelers} onChange={onChangeTravelers} busy={busy} disabled={isPaid} />
 
       <div className={busy ? 'opacity-60 transition-opacity duration-realce' : 'transition-opacity duration-realce'}>
         {!budget ? (

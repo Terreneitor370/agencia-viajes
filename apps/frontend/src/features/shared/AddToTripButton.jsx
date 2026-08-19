@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../../core/api/client';
 import Boton from '../../components/ui/Boton';
@@ -10,6 +10,9 @@ export default function AddToTripButton({ item, type, onAdded }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
+  const [trips, setTrips] = useState([]);
+  const [showPicker, setShowPicker] = useState(false);
+  const [selectedTripId, setSelectedTripId] = useState('');
 
   const getTypeName = () => {
     if (type === 'flight') return 'vuelo';
@@ -17,25 +20,24 @@ export default function AddToTripButton({ item, type, onAdded }) {
     return 'elemento';
   };
 
-  /** El POST real. Asume que ya hay sesion: la checa quien la llame. */
-  const agregar = async () => {
-    const tripsRes = await api.get('/trips');
-    const trips = tripsRes.data || [];
-    if (trips.length === 0) {
-      setError('Primero crea un viaje desde "Mis viajes"');
-      return;
-    }
-    await api.post(`/trips/${trips[0].id}/items`, construirPayload(item, type));
+  /** Carga la lista de viajes del usuario. */
+  const loadTrips = async () => {
+    const res = await api.get('/trips');
+    const data = res.data || [];
+    setTrips(data);
+    if (data.length === 1) setSelectedTripId(data[0].id);
+    return data;
+  };
+
+  /** El POST real. */
+  const agregar = async (tripId) => {
+    await api.post(`/trips/${tripId}/items`, construirPayload(item, type));
     setSuccess(true);
     if (onAdded) onAdded(item);
     setTimeout(() => setSuccess(false), 3000);
   };
 
   const irALoginYRecordar = () => {
-    // Se guarda QUE se queria agregar y se manda a login. PendingTripItemResolver
-    // (montado en AppLayout) termina la accion sola en cuanto haya sesion,
-    // sin importar a que pantalla se vuelva -- los resultados de esta
-    // busqueda no sobreviven el viaje de ida y vuelta a /login.
     guardarPendiente(item, type);
     navigate('/login', { state: { from: location } });
   };
@@ -59,7 +61,17 @@ export default function AddToTripButton({ item, type, onAdded }) {
         return;
       }
 
-      await agregar();
+      const data = await loadTrips();
+      if (data.length === 0) {
+        setError('Primero crea un viaje desde "Mis viajes"');
+        setLoading(false);
+        return;
+      }
+      if (data.length === 1) {
+        await agregar(data[0].id);
+      } else {
+        setShowPicker(true);
+      }
     } catch (err) {
       if (err.status === 401) {
         irALoginYRecordar();
@@ -71,11 +83,64 @@ export default function AddToTripButton({ item, type, onAdded }) {
     }
   };
 
+  const handleConfirm = async () => {
+    if (!selectedTripId) return;
+    setLoading(true);
+    try {
+      await agregar(selectedTripId);
+      setShowPicker(false);
+    } catch (err) {
+      setError(err.message || `Error al agregar ${getTypeName()}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (success) {
     return (
       <span className="text-exito text-sm font-medium">
-        {type === 'flight' ? 'Vuelo' : type === 'stay' ? 'Hospedaje' : 'Elemento'} Agregado al viaje
+        {type === 'flight' ? 'Vuelo' : type === 'stay' ? 'Hospedaje' : 'Elemento'} agregado al viaje
       </span>
+    );
+  }
+
+  if (showPicker) {
+    return (
+      <div className="flex flex-col gap-2 rounded-md border border-borde bg-superficie p-3 shadow-tarjeta">
+        <p className="text-sm font-semibold text-tinta-700">Selecciona un viaje</p>
+        <select
+          value={selectedTripId}
+          onChange={(e) => setSelectedTripId(e.target.value)}
+          className="w-full rounded-md border border-bordeInteractivo px-3 py-2 text-sm"
+        >
+          <option value="">-- Elege un viaje --</option>
+          {trips.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.title} ({t.origin_city} → {t.destination_city})
+            </option>
+          ))}
+        </select>
+        <div className="flex gap-2">
+          <Boton
+            variante="primario"
+            tamano="sm"
+            cargando={loading}
+            onClick={handleConfirm}
+            disabled={!selectedTripId || loading}
+          >
+            Agregar
+          </Boton>
+          <Boton
+            variante="secundario"
+            tamano="sm"
+            onClick={() => setShowPicker(false)}
+            disabled={loading}
+          >
+            Cancelar
+          </Boton>
+        </div>
+        {error && <span className="text-critico text-xs">{error}</span>}
+      </div>
     );
   }
 
