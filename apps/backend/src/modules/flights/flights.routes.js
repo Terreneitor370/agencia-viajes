@@ -16,8 +16,9 @@ router.get('/search', optionalAuth, externalApiLimiter, validate({ query: search
 // Catalogo para el autocompletado de ciudades (sin validacion de schema).
 router.get('/airports', optionalAuth, externalApiLimiter, asyncHandler(controller.airports));
 
-// Tasa de cambio para convertir precios sin re-buscar.
-router.get('/rates', optionalAuth, asyncHandler(controller.rates));
+// Tasa de cambio para convertir precios sin re-buscar. Tambien consume un
+// proveedor externo (Frankfurter): mismo limite que /search y /airports.
+router.get('/rates', optionalAuth, externalApiLimiter, asyncHandler(controller.rates));
 
 const openapiPaths = {
   '/search': {
@@ -48,7 +49,7 @@ const openapiPaths = {
         { name: 'from', in: 'query', required: true, schema: { type: 'string', enum: ['MXN', 'USD', 'EUR'] } },
         { name: 'to', in: 'query', required: true, schema: { type: 'string', enum: ['MXN', 'USD', 'EUR'] } },
       ],
-      responses: { 200: { description: 'Tasa' }, 400: { description: 'Monedas invalidas' } },
+      responses: { 200: { description: 'Tasa' }, 400: { description: 'Monedas invalidas' }, 429: { $ref: '#/components/responses/RateLimited' } },
     },
   },
 };
