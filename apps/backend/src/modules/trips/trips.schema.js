@@ -27,7 +27,7 @@ const createTripSchema = z.object({
 const addTripItemSchema = z.object({
   type: z.enum(['flight', 'stay', 'experience', 'other']),
   provider: z.string().trim().max(40),
-  externalId: z.string().trim().max(256).nullable().default(null),
+  externalId: z.string().trim().max(120).nullable().default(null),
   title: z.string().trim().min(1).max(160),
   unitPriceCents: z.number().int().min(0).max(100_000_000),
   currency: z.enum(['MXN', 'USD', 'EUR']),
