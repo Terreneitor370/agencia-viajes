@@ -61,6 +61,12 @@ export default function AddToTripButton({ item, type, onAdded }) {
         return;
       }
 
+      if (type === 'flight') {
+        guardarPendiente(item, type);
+        navigate('/viajes', { state: { message: 'Crea tu viaje y el vuelo se agregara automaticamente.' } });
+        return;
+      }
+
       const data = await loadTrips();
       if (data.length === 0) {
         setError('Primero crea un viaje desde "Mis viajes"');
