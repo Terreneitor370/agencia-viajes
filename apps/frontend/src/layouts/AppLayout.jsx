@@ -7,6 +7,7 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../core/auth/useAuth';
 import Boton from '../components/ui/Boton';
+import PendingTripItemResolver from '../features/shared/PendingTripItemResolver';
 
 const enlace = ({ isActive }) => [
   'rounded px-3 py-1.5 text-cuerpo transition-colors',
@@ -84,6 +85,8 @@ export default function AppLayout() {
       <main className="mx-auto max-w-6xl px-4 py-6">
         <Outlet />
       </main>
+
+      <PendingTripItemResolver />
     </div>
   );
 }

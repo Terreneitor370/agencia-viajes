@@ -1,104 +1,71 @@
 import { useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../../core/api/client';
 import Boton from '../../components/ui/Boton';
+import { construirPayload, guardarPendiente } from './pendingTripItem';
 
 export default function AddToTripButton({ item, type, onAdded }) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
-  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
 
-  // Obtener el nombre del tipo para mostrar en mensajes
   const getTypeName = () => {
     if (type === 'flight') return 'vuelo';
     if (type === 'stay') return 'hospedaje';
     return 'elemento';
   };
 
+  /** El POST real. Asume que ya hay sesion: la checa quien la llame. */
+  const agregar = async () => {
+    const tripsRes = await api.get('/trips');
+    const trips = tripsRes.data || [];
+    if (trips.length === 0) {
+      setError('Primero crea un viaje desde "Mis viajes"');
+      return;
+    }
+    await api.post(`/trips/${trips[0].id}/items`, construirPayload(item, type));
+    setSuccess(true);
+    if (onAdded) onAdded(item);
+    setTimeout(() => setSuccess(false), 3000);
+  };
+
+  const irALoginYRecordar = () => {
+    // Se guarda QUE se queria agregar y se manda a login. PendingTripItemResolver
+    // (montado en AppLayout) termina la accion sola en cuanto haya sesion,
+    // sin importar a que pantalla se vuelva -- los resultados de esta
+    // busqueda no sobreviven el viaje de ida y vuelta a /login.
+    guardarPendiente(item, type);
+    navigate('/login', { state: { from: location } });
+  };
+
   const handleAdd = async () => {
     setLoading(true);
     setError(null);
     setSuccess(false);
-    setShowLoginPrompt(false);
 
     try {
-      // 1. Verificar si hay sesión activa
-      let user = null;
+      let autenticado = true;
       try {
-        const meRes = await api.get('/auth/me');
-        user = meRes.data;
+        await api.get('/auth/me');
       } catch (authErr) {
-        if (authErr.status === 401) {
-          setShowLoginPrompt(true);
-          setLoading(false);
-          return;
-        }
-        throw authErr;
+        if (authErr.status === 401) autenticado = false;
+        else throw authErr;
       }
 
-      if (!user) {
-        setShowLoginPrompt(true);
-        setLoading(false);
+      if (!autenticado) {
+        irALoginYRecordar();
         return;
       }
 
-      // 2. Obtener el primer viaje del usuario
-      const tripsRes = await api.get('/trips');
-      const trips = tripsRes.data || [];
-      
-      if (trips.length === 0) {
-        setError('Primero crea un viaje desde "Mis viajes"');
-        setLoading(false);
-        return;
-      }
-
-      const tripId = trips[0].id;
-
-      // 3. Construir el payload según el tipo
-      let title = '';
-      let unitPriceCents = 0;
-      let currency = 'MXN';
-      let pricingMode = 'per_person';
-      let estimated = false;
-
-      if (type === 'flight') {
-        title = `${item.origin} → ${item.destination} (${item.airline})`;
-        unitPriceCents = Math.round(item.price.amount * 100);
-        currency = item.price.currency || 'MXN';
-        pricingMode = item.pricingMode || 'per_person';
-        estimated = item.price.estimated || false;
-      } else if (type === 'stay') {
-        title = item.name || 'Hospedaje sin nombre';
-        unitPriceCents = Math.round((item.price?.amount || 0) * 100);
-        currency = item.price?.currency || 'MXN';
-        pricingMode = item.pricingMode || 'per_night_per_room';
-        estimated = item.price?.estimated || true;
-      }
-
-      const payload = {
-        type: type,
-        provider: item.provider || 'unknown',
-        externalId: item.externalId || null,
-        title,
-        unitPriceCents,
-        currency,
-        pricingMode,
-        quantity: 1,
-        estimated,
-      };
-
-      await api.post(`/trips/${tripId}/items`, payload);
-      
-      setSuccess(true);
-      if (onAdded) onAdded(item);
-      
-      setTimeout(() => setSuccess(false), 3000);
+      await agregar();
     } catch (err) {
       if (err.status === 401) {
-        setShowLoginPrompt(true);
-      } else {
-        setError(err.message || `Error al agregar ${getTypeName()}`);
+        irALoginYRecordar();
+        return;
       }
+      setError(err.message || `Error al agregar ${getTypeName()}`);
     } finally {
       setLoading(false);
     }
@@ -109,25 +76,6 @@ export default function AddToTripButton({ item, type, onAdded }) {
       <span className="text-exito text-sm font-medium">
         {type === 'flight' ? 'Vuelo' : type === 'stay' ? 'Hospedaje' : 'Elemento'} Agregado al viaje
       </span>
-    );
-  }
-
-  if (showLoginPrompt) {
-    return (
-      <div className="flex flex-col items-end gap-1">
-        <div className="bg-ambar-50 border border-dashed border-ambar-400 rounded-md px-3 py-2 text-sm text-ambar-700 max-w-[200px]">
-          <p className="font-medium">Inicia sesión</p>
-          <p className="text-xs text-ambar-600">
-            Para guardar este {getTypeName()} en tu viaje
-          </p>
-        </div>
-        <button
-          onClick={() => setShowLoginPrompt(false)}
-          className="text-xs text-tinta-400 hover:text-tinta-600"
-        >
-          ✕ Cerrar
-        </button>
-      </div>
     );
   }
 
