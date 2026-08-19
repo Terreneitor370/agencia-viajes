@@ -3,7 +3,7 @@ const { isInWindow, todayStr } = require('../flights/dates');
 const { CURRENCIES } = require('../flights/currency');
 
 const searchStaysSchema = z.object({
-  city: z.string().trim().min(2).max(80).regex(/^[a-zA-ZáéíóúñüÁÉÍÓÚÑÜ\s.\-]+$/, 'Solo se permiten letras, espacios y guiones'),
+  city: z.string().trim().min(2).max(80),
   countryCode: z.string().trim().length(2).optional(),
   checkIn: z.string().refine((d) => isInWindow(d), { message: `La entrada debe estar entre ${todayStr()} y hasta 11 meses` }),
   checkOut: z.string().refine((d) => isInWindow(d), { message: `La salida debe estar entre ${todayStr()} y hasta 11 meses` }),

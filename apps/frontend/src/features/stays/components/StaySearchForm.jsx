@@ -23,18 +23,10 @@ export default function StaySearchForm({ onSearch, loading, defaultCity = '', on
   });
 
   const [dateError, setDateError] = useState('');
-  const [cityError, setCityError] = useState('');
-
-  const CITY_RE = /^[a-zA-ZáéíóúñüÁÉÍÓÚÑÜ\s.\-]+$/;
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.city || !form.checkIn || !form.checkOut) return;
-    if (!CITY_RE.test(form.city.trim()) || form.city.trim().length < 2) {
-      setCityError('Ingresa un nombre de ciudad válido (solo letras y espacios)');
-      return;
-    }
-    setCityError('');
     if (form.checkIn && form.checkOut && form.checkOut <= form.checkIn) {
       setDateError('La fecha de salida debe ser posterior a la de llegada');
       return;
@@ -49,8 +41,7 @@ export default function StaySearchForm({ onSearch, loading, defaultCity = '', on
       let nextValue = type === 'number' ? parseInt(value, 10) : value;
       if (name === 'travelers') nextValue = clamp(nextValue, 1, 20);
       const next = { ...prev, [name]: nextValue };
-      // Limpiar errores cuando cambian los campos
-      if (name === 'city' && cityError) setCityError('');
+      // Limpiar error de fechas cuando cambian las fechas
       if ((name === 'checkIn' || name === 'checkOut') && dateError) setDateError('');
       return next;
     });
@@ -71,7 +62,6 @@ export default function StaySearchForm({ onSearch, loading, defaultCity = '', on
           className="mt-1 w-full rounded-md border border-bordeInteractivo px-3 py-2 focus:outline-none focus:ring-2 focus:ring-azul-400"
           required
         />
-        {cityError && <p className="text-xs text-critico mt-1">{cityError}</p>}
       </label>
 
       {/* Fecha de llegada */}
