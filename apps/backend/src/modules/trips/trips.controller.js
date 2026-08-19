@@ -17,8 +17,11 @@ async function loadOwnTrip(req) {
 
 exports.list = async (req, res) => {
   const { page, pageSize } = req.query;
-  const trips = await repo.listByUser(req.user.id, { limit: pageSize, offset: (page - 1) * pageSize });
-  return respond.ok(res, trips);
+  const [trips, total] = await Promise.all([
+    repo.listByUser(req.user.id, { limit: pageSize, offset: (page - 1) * pageSize }),
+    repo.countByUser(req.user.id),
+  ]);
+  return respond.paginated(res, trips, { page, pageSize, total });
 };
 
 exports.create = async (req, res) => {
@@ -53,12 +56,12 @@ exports.update = async (req, res) => {
 
 exports.detail = async (req, res) => {
   const trip = await loadOwnTrip(req);
-  return respond.ok(res, { ...trip, items: await repo.listItems(trip.id) });
+  return respond.ok(res, { ...trip, items: await repo.listItems(trip.id, req.user.id) });
 };
 
 exports.budget = async (req, res) => {
   const trip = await loadOwnTrip(req);
-  const rows = await repo.listItems(trip.id);
+  const rows = await repo.listItems(trip.id, req.user.id);
   const nights = nightsOf(trip);
   const budget = computeBudget({
     items: rows.map((r) => ({
@@ -80,20 +83,21 @@ exports.updateTravelers = async (req, res) => {
 exports.addItem = async (req, res) => {
   const trip = await loadOwnTrip(req);
   const id = crypto.randomUUID();
-  await repo.addItem({ id, tripId: trip.id, ...req.body });
+  const result = await repo.addItem({ id, tripId: trip.id, userId: req.user.id, ...req.body });
+  if (!result.affectedRows) throw ApiError.notFound('Viaje no encontrado');
   return respond.created(res, { id });
 };
 
 exports.updateItemQuantity = async (req, res) => {
   const trip = await loadOwnTrip(req);
-  const result = await repo.updateItemQuantity(req.params.itemId, trip.id, req.body.quantity);
+  const result = await repo.updateItemQuantity(req.params.itemId, trip.id, req.user.id, req.body.quantity);
   if (!result.affectedRows) throw ApiError.notFound('Concepto no encontrado en el viaje');
   return exports.budget(req, res);
 };
 
 exports.removeItem = async (req, res) => {
   const trip = await loadOwnTrip(req);
-  const result = await repo.removeItem(req.params.itemId, trip.id);
+  const result = await repo.removeItem(req.params.itemId, trip.id, req.user.id);
   if (!result.affectedRows) throw ApiError.notFound('Concepto no encontrado en el viaje');
   return exports.budget(req, res);
 };

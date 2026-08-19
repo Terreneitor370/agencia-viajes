@@ -24,15 +24,18 @@ module.exports = {
     );
   },
 
+  countByUser: async (userId) => {
+    const row = await db.queryOne(
+      'SELECT COUNT(*) AS total FROM trips WHERE user_id = ? AND deleted_at IS NULL',
+      [userId],
+    );
+    return Number(row?.total || 0);
+  },
+
   /** Solo devuelve el viaje si pertenece al usuario. */
   findByIdForUser: (id, userId) => db.queryOne(
     `SELECT ${COLUMNS} FROM trips WHERE id = ? AND user_id = ? AND deleted_at IS NULL LIMIT 1`,
     [id, userId],
-  ),
-
-  /** Version para administradores. Su uso DEBE registrarse en audit_log. */
-  findByIdAsAdmin: (id) => db.queryOne(
-    `SELECT ${COLUMNS} FROM trips WHERE id = ? AND deleted_at IS NULL LIMIT 1`, [id],
   ),
 
   create: (trip) => db.query(
@@ -74,28 +77,39 @@ module.exports = {
     'UPDATE trips SET deleted_at = NOW() WHERE id = ? AND user_id = ?', [id, userId],
   ),
 
-  listItems: (tripId) => db.query(
-    `SELECT id, trip_id, type, provider, external_id, title, unit_price_cents, currency,
-            pricing_mode, quantity, estimated, meta
-       FROM trip_items WHERE trip_id = ? ORDER BY created_at ASC`,
-    [tripId],
+  listItems: (tripId, userId) => db.query(
+    `SELECT ti.id, ti.trip_id, ti.type, ti.provider, ti.external_id, ti.title, ti.unit_price_cents, ti.currency,
+            ti.pricing_mode, ti.quantity, ti.estimated, ti.meta
+       FROM trip_items ti
+       JOIN trips t ON t.id = ti.trip_id
+      WHERE ti.trip_id = ? AND t.user_id = ? AND t.deleted_at IS NULL
+      ORDER BY ti.created_at ASC`,
+    [tripId, userId],
   ),
 
   addItem: (item) => db.query(
     `INSERT INTO trip_items (id, trip_id, type, provider, external_id, title, unit_price_cents,
                              currency, pricing_mode, quantity, estimated, meta)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+       FROM trips
+      WHERE trips.id = ? AND trips.user_id = ? AND trips.deleted_at IS NULL`,
     [item.id, item.tripId, item.type, item.provider, item.externalId, item.title,
       item.unitPriceCents, item.currency, item.pricingMode, item.quantity, item.estimated,
-      item.meta ? JSON.stringify(item.meta) : null],
+      item.meta ? JSON.stringify(item.meta) : null, item.tripId, item.userId],
   ),
 
-  updateItemQuantity: (itemId, tripId, quantity) => db.query(
-    'UPDATE trip_items SET quantity = ? WHERE id = ? AND trip_id = ?',
-    [quantity, itemId, tripId],
+  updateItemQuantity: (itemId, tripId, userId, quantity) => db.query(
+    `UPDATE trip_items ti
+      JOIN trips t ON t.id = ti.trip_id
+       SET ti.quantity = ?
+     WHERE ti.id = ? AND ti.trip_id = ? AND t.user_id = ? AND t.deleted_at IS NULL`,
+    [quantity, itemId, tripId, userId],
   ),
 
-  removeItem: (itemId, tripId) => db.query(
-    'DELETE FROM trip_items WHERE id = ? AND trip_id = ?', [itemId, tripId],
+  removeItem: (itemId, tripId, userId) => db.query(
+    `DELETE ti FROM trip_items ti
+      JOIN trips t ON t.id = ti.trip_id
+     WHERE ti.id = ? AND ti.trip_id = ? AND t.user_id = ? AND t.deleted_at IS NULL`,
+    [itemId, tripId, userId],
   ),
 };

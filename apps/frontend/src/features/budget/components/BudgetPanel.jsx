@@ -25,6 +25,10 @@ function Breakdown({ budget, currency }) {
   const categories = ORDER
     .map((key) => [key, Number(budget?.byCategory?.[key] || 0)])
     .filter(([, value]) => value > 0);
+  const contingencyPct = Number(budget?.contingencyRate ?? 0.1) * 100;
+  const contingencyLabel = Number.isInteger(contingencyPct)
+    ? contingencyPct.toFixed(0)
+    : contingencyPct.toFixed(1).replace(/\.0$/, '');
 
   return (
     <dl className="space-y-2 text-cuerpo">
@@ -40,7 +44,7 @@ function Breakdown({ budget, currency }) {
         <dd className="precio-col-sm text-tinta-900">{dinero(budget?.subtotal, currency)}</dd>
       </div>
       <div className="flex items-center justify-between gap-3">
-        <dt className="text-tinta-500">Fondo de imprevistos 10%</dt>
+        <dt className="text-tinta-500">Fondo de imprevistos {contingencyLabel}%</dt>
         <dd className="precio-col-sm text-tinta-900">{dinero(budget?.contingency, currency)}</dd>
       </div>
       <div className="flex items-center justify-between gap-3 border-t border-borde pt-2">
