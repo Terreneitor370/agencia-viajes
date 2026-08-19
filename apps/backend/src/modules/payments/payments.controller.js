@@ -7,6 +7,17 @@ exports.createCheckout = async (req, res) => {
   res.status(201).json({ success: true, data: result });
 };
 
+exports.createPaymentIntent = async (req, res) => {
+  const { tripId, currency } = req.body;
+  const result = await service.createPaymentIntent(req.user.id, tripId, currency);
+  res.status(201).json({ success: true, data: result });
+};
+
+exports.confirmOrder = async (req, res) => {
+  const order = await service.confirmOrder(req.params.id, req.user.id);
+  res.json({ success: true, data: order });
+};
+
 exports.webhook = async (req, res) => {
   const signature = req.headers['stripe-signature'];
   await service.handleWebhook(req.body, signature);

@@ -25,6 +25,15 @@ router.post('/checkout', authenticate, writeLimiter,
   asyncHandler(controller.createCheckout),
 );
 
+router.post('/intent', authenticate, writeLimiter,
+  validate({ body: createCheckoutSchema }),
+  asyncHandler(controller.createPaymentIntent),
+);
+
+router.post('/orders/:id/confirm', authenticate,
+  asyncHandler(controller.confirmOrder),
+);
+
 router.get('/orders/:id', authenticate,
   asyncHandler(controller.orderStatus),
 );

@@ -230,4 +230,98 @@ async function listOrders(userId, tripId) {
   );
 }
 
-module.exports = { createCheckoutSession, handleWebhook, getOrderStatus, getOrderBySession, listOrders };
+/**
+ * Crea un PaymentIntent y una orden para pago embebido (Stripe Elements).
+ * Devuelve clientSecret para que el frontend confirme el pago con CardElement.
+ */
+async function createPaymentIntent(userId, tripId, currency) {
+  const trip = await db.queryOne(
+    'SELECT * FROM trips WHERE id = ? AND user_id = ? AND deleted_at IS NULL',
+    [tripId, userId],
+  );
+  if (!trip) throw ApiError.notFound('Viaje no encontrado');
+
+  const items = await db.query(
+    'SELECT * FROM trip_items WHERE trip_id = ?',
+    [tripId],
+  );
+  if (!items.length) throw ApiError.badRequest('El viaje no tiene conceptos para pagar');
+
+  const travelers = Number(trip.travelers || 1);
+  const nights = nightsBetween(trip.start_date, trip.end_date);
+  const rooms = Math.ceil(travelers / 2);
+  const totalCents = computeTotalCents(items, travelers, nights, rooms);
+  if (totalCents <= 0) throw ApiError.badRequest('El total del viaje es $0');
+
+  const orderId = crypto.randomUUID();
+  await db.query(
+    `INSERT INTO orders (id, user_id, trip_id, total_cents, currency, item_count, status)
+     VALUES (?, ?, ?, ?, ?, ?, 'pending')`,
+    [orderId, userId, tripId, totalCents, currency || trip.currency, items.length],
+  );
+
+  for (const item of items) {
+    const unitPrice = Number(item.unit_price_cents || 0);
+    const qty = Math.max(1, Number(item.quantity || 1));
+    const subtotal = unitPrice * qty;
+    await db.query(
+      `INSERT INTO order_items (id, order_id, trip_item_id, title, unit_price_cents, quantity, subtotal_cents)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [crypto.randomUUID(), orderId, item.id, item.title, unitPrice, qty, subtotal],
+    );
+  }
+
+  const stripeCurrency = (currency || trip.currency).toLowerCase();
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: totalCents,
+    currency: stripeCurrency,
+    metadata: { orderId, tripId, userId },
+  });
+
+  await db.query(
+    'UPDATE orders SET stripe_session_id = ? WHERE id = ?',
+    [paymentIntent.id, orderId],
+  );
+
+  logger.info('PaymentIntent creado', { orderId, piId: paymentIntent.id, totalCents });
+
+  return {
+    clientSecret: paymentIntent.client_secret,
+    orderId,
+    totalCents,
+    currency: currency || trip.currency,
+  };
+}
+
+/**
+ * Confirma una orden despues de que el frontend confirmo el pago con Stripe Elements.
+ */
+async function confirmOrder(orderId, userId) {
+  const order = await db.queryOne(
+    'SELECT * FROM orders WHERE id = ? AND user_id = ?',
+    [orderId, userId],
+  );
+  if (!order) throw ApiError.notFound('Orden no encontrada');
+
+  if (order.status === 'paid') return order;
+
+  if (order.stripe_session_id) {
+    try {
+      const pi = await stripe.paymentIntents.retrieve(order.stripe_session_id);
+      if (pi.status === 'succeeded') {
+        await db.query(
+          "UPDATE orders SET status = 'paid', stripe_payment_intent = ? WHERE id = ? AND status = 'pending'",
+          [pi.id, order.id],
+        );
+        order.status = 'paid';
+        order.stripe_payment_intent = pi.id;
+      }
+    } catch (err) {
+      logger.warn('No se pudo confirmar orden con Stripe', { orderId: order.id, error: err.message });
+    }
+  }
+
+  return order;
+}
+
+module.exports = { createCheckoutSession, createPaymentIntent, confirmOrder, handleWebhook, getOrderStatus, getOrderBySession, listOrders };

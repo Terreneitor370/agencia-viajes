@@ -106,8 +106,6 @@ function TravelersControl({ travelers, onChange, busy }) {
 
 function BudgetContent({ budget, travelers, onChangeTravelers, busy, tripId, currency: currencyProp }) {
   const navigate = useNavigate();
-  const [paying, setPaying] = useState(false);
-  const [payError, setPayError] = useState('');
   const [orderStatus, setOrderStatus] = useState(null);
   const currency = currencyProp || budget?.currency || 'MXN';
   const limit = budget?.budgetLimit == null ? null : Number(budget.budgetLimit);
@@ -135,15 +133,7 @@ function BudgetContent({ budget, travelers, onChangeTravelers, busy, tripId, cur
   }, [tripId]);
 
   const handlePay = async () => {
-    setPaying(true);
-    setPayError('');
-    try {
-      const res = await paymentsApi.createCheckout({ tripId, currency });
-      window.location.href = res.data.sessionUrl;
-    } catch (err) {
-      setPayError(err.message || 'No se pudo iniciar el pago.');
-      setPaying(false);
-    }
+    navigate(`/checkout?trip_id=${tripId}&currency=${encodeURIComponent(currency)}`);
   };
 
   return (
@@ -207,16 +197,13 @@ function BudgetContent({ budget, travelers, onChangeTravelers, busy, tripId, cur
                 <button
                   type="button"
                   onClick={handlePay}
-                  disabled={paying || busy}
+                  disabled={busy}
                   className="w-full rounded-md bg-exito px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-700 active:bg-green-800 disabled:opacity-50"
                 >
-                  {paying ? 'Redirigiendo a Stripe...' : 'Reservar y pagar'}
+                  Reservar y pagar
                 </button>
-                {payError && (
-                  <p className="text-menor text-critico text-center">{payError}</p>
-                )}
                 <p className="text-xs text-tinta-400 text-center">
-                  Pago seguro via Stripe. Tarjeta de prueba: 4242 4242 4242 4242
+                  Pago seguro via Stripe
                 </p>
               </div>
             )}
