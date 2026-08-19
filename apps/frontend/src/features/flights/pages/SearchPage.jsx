@@ -96,6 +96,10 @@ export default function SearchPage() {
   const onSubmit = (event) => {
     event.preventDefault();
     if (totalTravelers < 1 || totalTravelers > 9) return;
+    if (form.tripType === 'round_trip' && form.returnDate && form.departureDate && form.returnDate <= form.departureDate) {
+      setState((s) => ({ ...s, error: 'La fecha de regreso debe ser posterior a la de salida.' }));
+      return;
+    }
     doSearch({
       tripType: form.tripType,
       origin: form.origin,
@@ -190,7 +194,7 @@ export default function SearchPage() {
                 type="date"
                 value={form.returnDate}
                 onChange={update('returnDate')}
-                min={form.departureDate || todayStr}
+                min={form.departureDate ? new Date(new Date(form.departureDate).getTime() + 86400000).toISOString().split('T')[0] : todayStr}
                 max={maxDateStr}
                 required
                 className={inputCls}
