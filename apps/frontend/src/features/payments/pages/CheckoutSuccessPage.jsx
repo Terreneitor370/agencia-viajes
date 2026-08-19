@@ -71,7 +71,7 @@ export default function CheckoutSuccessPage() {
           <div className="text-4xl">&#10003;</div>
           <h1 className="text-seccion text-exito">Pago exitoso</h1>
           <p className="text-cuerpo text-tinta-700">
-            Tu reserva ha sido confirmada. Recibiras un correo con los detalles.
+            Tu reserva ha sido confirmada. Puedes ver los detalles en tu viaje.
           </p>
         </>
       ) : (
