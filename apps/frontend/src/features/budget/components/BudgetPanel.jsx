@@ -5,8 +5,10 @@
  * llega de la API y envia cambios de viajeros.
  */
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Distintivo from '../../../components/ui/Distintivo';
 import { dinero } from '../../../core/utils/formato';
+import { paymentsApi } from '../../payments/api';
 
 const LABELS = {
   flight: 'Vuelos',
@@ -102,8 +104,11 @@ function TravelersControl({ travelers, onChange, busy }) {
   );
 }
 
-function BudgetContent({ budget, travelers, onChangeTravelers, busy }) {
-  const currency = budget?.currency || 'MXN';
+function BudgetContent({ budget, travelers, onChangeTravelers, busy, tripId, currency: currencyProp }) {
+  const navigate = useNavigate();
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState('');
+  const currency = currencyProp || budget?.currency || 'MXN';
   const limit = budget?.budgetLimit == null ? null : Number(budget.budgetLimit);
   const total = Number(budget?.total || 0);
   const hasLimit = Number.isFinite(limit) && limit > 0;
@@ -111,6 +116,19 @@ function BudgetContent({ budget, travelers, onChangeTravelers, busy }) {
   const progress = hasLimit ? Math.max(2, Math.min(100, pct)) : 0;
   const nearLimit = hasLimit && !budget?.overBudget && pct >= 90;
   const remaining = Number(budget?.remaining || 0);
+  const hasItems = budget && budget.total > 0;
+
+  const handlePay = async () => {
+    setPaying(true);
+    setPayError('');
+    try {
+      const res = await paymentsApi.createCheckout({ tripId, currency });
+      window.location.href = res.data.sessionUrl;
+    } catch (err) {
+      setPayError(err.message || 'No se pudo iniciar el pago.');
+      setPaying(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -167,6 +185,25 @@ function BudgetContent({ budget, travelers, onChangeTravelers, busy }) {
                 ✓ Te quedan {dinero(Math.max(0, remaining), currency)} antes de alcanzar tu limite.
               </p>
             )}
+
+            {hasItems && (
+              <div className="pt-2 border-t border-borde space-y-2">
+                <button
+                  type="button"
+                  onClick={handlePay}
+                  disabled={paying || busy}
+                  className="w-full rounded-md bg-exito px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-700 active:bg-green-800 disabled:opacity-50"
+                >
+                  {paying ? 'Redirigiendo a Stripe...' : 'Reservar y pagar'}
+                </button>
+                {payError && (
+                  <p className="text-menor text-critico text-center">{payError}</p>
+                )}
+                <p className="text-xs text-tinta-400 text-center">
+                  Pago seguro via Stripe. Tarjeta de prueba: 4242 4242 4242 4242
+                </p>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -174,7 +211,7 @@ function BudgetContent({ budget, travelers, onChangeTravelers, busy }) {
   );
 }
 
-export default function BudgetPanel({ budget, travelers = 1, onChangeTravelers, busy = false, className = '' }) {
+export default function BudgetPanel({ budget, travelers = 1, onChangeTravelers, busy = false, className = '', tripId, currency }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const safeTravelers = clampTravelers(travelers);
 
@@ -187,9 +224,9 @@ export default function BudgetPanel({ budget, travelers = 1, onChangeTravelers, 
     if (!budget) {
       return { total: 'Sin datos', status: null };
     }
-    const currency = budget.currency || 'MXN';
+    const cur = budget.currency || 'MXN';
     const status = budget.overBudget ? 'critico' : 'exito';
-    return { total: dinero(budget.total, currency), status };
+    return { total: dinero(budget.total, cur), status };
   }, [budget]);
 
   return (
@@ -200,6 +237,8 @@ export default function BudgetPanel({ budget, travelers = 1, onChangeTravelers, 
           travelers={safeTravelers}
           onChangeTravelers={changeTravelers}
           busy={busy}
+          tripId={tripId}
+          currency={currency}
         />
       </aside>
 
@@ -234,6 +273,8 @@ export default function BudgetPanel({ budget, travelers = 1, onChangeTravelers, 
               travelers={safeTravelers}
               onChangeTravelers={changeTravelers}
               busy={busy}
+              tripId={tripId}
+              currency={currency}
             />
           </div>
         )}

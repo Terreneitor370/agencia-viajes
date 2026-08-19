@@ -30,6 +30,10 @@ const PERMISSIONS = {
   BUDGET_READ_OWN: 'budget:read:own',
   BUDGET_UPDATE_OWN: 'budget:update:own',
 
+  // Pagos
+  PAYMENT_CREATE: 'payment:create',
+  PAYMENT_READ_OWN: 'payment:read:own',
+
   // Cuenta propia
   PROFILE_READ_OWN: 'profile:read:own',
   PROFILE_UPDATE_OWN: 'profile:update:own',
@@ -49,6 +53,7 @@ const TRAVELER_PERMISSIONS = [
   P.FLIGHT_SEARCH, P.STAY_SEARCH, P.EXPERIENCE_SEARCH,
   P.TRIP_CREATE, P.TRIP_READ_OWN, P.TRIP_UPDATE_OWN, P.TRIP_DELETE_OWN,
   P.BUDGET_READ_OWN, P.BUDGET_UPDATE_OWN,
+  P.PAYMENT_CREATE, P.PAYMENT_READ_OWN,
   P.PROFILE_READ_OWN, P.PROFILE_UPDATE_OWN,
 ];
 

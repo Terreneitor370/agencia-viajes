@@ -408,6 +408,8 @@ export default function TripDetailPage() {
           travelers={trip.travelers}
           onChangeTravelers={onTravelersChange}
           busy={travelersBusy}
+          tripId={trip.id}
+          currency={trip.currency}
           className="lg:sticky lg:top-4"
         />
       </div>

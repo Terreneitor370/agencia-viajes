@@ -54,6 +54,10 @@ const schema = z.object({
   GEOAPIFY_API_KEY: z.string().default(''),
   UNSPLASH_ACCESS_KEY: z.string().default(''),
 
+  // Stripe (pagos)
+  STRIPE_SECRET_KEY: z.string().default(''),
+  STRIPE_WEBHOOK_SECRET: z.string().default(''),
+
   // Postura de seguridad en runtime: monitor = solo registra, block = corta la peticion (RASP)
   SECURITY_ENFORCE: z.enum(['monitor', 'block']).default('block'),
   EXTERNAL_CACHE_TTL_SECONDS: z.coerce.number().int().default(3600),
