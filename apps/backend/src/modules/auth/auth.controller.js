@@ -150,6 +150,10 @@ exports.googleCallback = async (req, res) => {
     return res.redirect(env.FRONTEND_URL);
   } catch (err) {
     logger.security('OAUTH_GOOGLE_FAILED', { message: err.message });
+    // El unico caso de googleExchange() con un mensaje seguro de mostrar tal
+    // cual: el correo ya tiene cuenta con contrasena. El resto (token invalido,
+    // id_token no verificable, etc.) se queda generico a proposito.
+    if (err.status === 409) return loginWithError(res, 'correo_registrado');
     return loginWithError(res, 'fallo');
   }
 };

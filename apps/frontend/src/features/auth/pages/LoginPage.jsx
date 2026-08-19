@@ -17,6 +17,7 @@ const OAUTH_ERROR_MESSAGES = {
   denegado: 'Cancelaste el inicio de sesion con Google.',
   estado_invalido: 'Tu sesion con Google expiro, intenta de nuevo.',
   solicitud_invalida: 'No pudimos completar el inicio de sesion con Google.',
+  correo_registrado: 'Ya existe una cuenta con este correo. Inicia sesion con tu contrasena.',
   fallo: 'No fue posible iniciar sesion con Google. Intenta de nuevo.',
 };
 
