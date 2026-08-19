@@ -74,7 +74,10 @@ async function createCheckoutSession(userId, tripId, currency) {
   const session = await stripe.checkout.sessions.create({
     payment_method_types: ['card'],
     mode: 'payment',
-    customer_email: undefined,
+    submit_type: 'pay',
+    billing_address_collection: 'auto',
+    customer_creation: 'if_required',
+    phone_number_collection: { enabled: false },
     line_items: items.map((item) => ({
       price_data: {
         currency: stripeCurrency,
