@@ -214,4 +214,20 @@ async function getOrderBySession(sessionId, userId) {
   return order;
 }
 
-module.exports = { createCheckoutSession, handleWebhook, getOrderStatus, getOrderBySession };
+/**
+ * Lista ordenes de un usuario, opcionalmente filtrado por trip_id.
+ */
+async function listOrders(userId, tripId) {
+  if (tripId) {
+    return db.query(
+      'SELECT * FROM orders WHERE user_id = ? AND trip_id = ? ORDER BY created_at DESC',
+      [userId, tripId],
+    );
+  }
+  return db.query(
+    'SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC LIMIT 20',
+    [userId],
+  );
+}
+
+module.exports = { createCheckoutSession, handleWebhook, getOrderStatus, getOrderBySession, listOrders };

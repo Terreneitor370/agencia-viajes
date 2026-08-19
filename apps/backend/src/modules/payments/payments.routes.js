@@ -5,6 +5,7 @@ const authenticate = require('../../middlewares/authenticate');
 const { writeLimiter } = require('../../middlewares/rateLimit');
 const asyncHandler = require('../../core/asyncHandler');
 const { createCheckoutSchema } = require('./payments.schema');
+const { z } = require('zod');
 const controller = require('./payments.controller');
 
 const router = Router();
@@ -14,6 +15,11 @@ const router = Router();
 router.post('/webhook', asyncHandler(controller.webhook));
 
 // Rutas protegidas
+router.get('/orders', authenticate,
+  validate({ query: z.object({ trip_id: z.string().uuid().optional(), session_id: z.string().optional() }).strict() }),
+  asyncHandler(controller.listOrders),
+);
+
 router.post('/checkout', authenticate, writeLimiter,
   validate({ body: createCheckoutSchema }),
   asyncHandler(controller.createCheckout),
@@ -21,10 +27,6 @@ router.post('/checkout', authenticate, writeLimiter,
 
 router.get('/orders/:id', authenticate,
   asyncHandler(controller.orderStatus),
-);
-
-router.get('/orders', authenticate,
-  asyncHandler(controller.orderBySession),
 );
 
 const openapiPaths = {

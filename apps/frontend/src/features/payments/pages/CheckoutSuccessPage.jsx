@@ -25,7 +25,7 @@ export default function CheckoutSuccessPage() {
     const maxAttempts = 10;
 
     const fetchOrder = () => {
-      paymentsApi.orderBySession(sessionId)
+      paymentsApi.listOrders({ session_id: sessionId })
         .then((res) => {
           if (cancelled) return;
           setOrder(res.data);

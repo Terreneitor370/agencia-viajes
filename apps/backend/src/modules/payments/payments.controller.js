@@ -1,6 +1,5 @@
 /** Controller de pagos. DUENO: Kassie (modulo B). */
 const service = require('./payments.service');
-const logger = require('../../core/logger');
 
 exports.createCheckout = async (req, res) => {
   const { tripId, currency } = req.body;
@@ -22,4 +21,13 @@ exports.orderStatus = async (req, res) => {
 exports.orderBySession = async (req, res) => {
   const order = await service.getOrderBySession(req.query.session_id, req.user.id);
   res.json({ success: true, data: order });
+};
+
+exports.listOrders = async (req, res) => {
+  if (req.query.session_id) {
+    const order = await service.getOrderBySession(req.query.session_id, req.user.id);
+    return res.json({ success: true, data: order });
+  }
+  const orders = await service.listOrders(req.user.id, req.query.trip_id);
+  res.json({ success: true, data: orders });
 };

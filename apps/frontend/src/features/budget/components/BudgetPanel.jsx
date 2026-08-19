@@ -4,7 +4,7 @@
  * El calculo lo hace SIEMPRE el backend: este componente solo renderiza lo que
  * llega de la API y envia cambios de viajeros.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Distintivo from '../../../components/ui/Distintivo';
 import { dinero } from '../../../core/utils/formato';
@@ -108,6 +108,7 @@ function BudgetContent({ budget, travelers, onChangeTravelers, busy, tripId, cur
   const navigate = useNavigate();
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState('');
+  const [orderStatus, setOrderStatus] = useState(null);
   const currency = currencyProp || budget?.currency || 'MXN';
   const limit = budget?.budgetLimit == null ? null : Number(budget.budgetLimit);
   const total = Number(budget?.total || 0);
@@ -117,6 +118,21 @@ function BudgetContent({ budget, travelers, onChangeTravelers, busy, tripId, cur
   const nearLimit = hasLimit && !budget?.overBudget && pct >= 90;
   const remaining = Number(budget?.remaining || 0);
   const hasItems = budget && budget.total > 0;
+  const isPaid = orderStatus === 'paid';
+
+  useEffect(() => {
+    if (!tripId) return;
+    let cancelled = false;
+    paymentsApi.listOrders({ trip_id: tripId })
+      .then((res) => {
+        if (cancelled) return;
+        const orders = res.data || [];
+        const paid = orders.find((o) => o.status === 'paid');
+        if (paid && !cancelled) setOrderStatus('paid');
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [tripId]);
 
   const handlePay = async () => {
     setPaying(true);
@@ -186,7 +202,7 @@ function BudgetContent({ budget, travelers, onChangeTravelers, busy, tripId, cur
               </p>
             )}
 
-            {hasItems && (
+            {hasItems && !isPaid && (
               <div className="pt-2 border-t border-borde space-y-2">
                 <button
                   type="button"
@@ -202,6 +218,15 @@ function BudgetContent({ budget, travelers, onChangeTravelers, busy, tripId, cur
                 <p className="text-xs text-tinta-400 text-center">
                   Pago seguro via Stripe. Tarjeta de prueba: 4242 4242 4242 4242
                 </p>
+              </div>
+            )}
+
+            {hasItems && isPaid && (
+              <div className="pt-2 border-t border-borde">
+                <div className="rounded-md border border-exito/20 bg-exitoSuave px-4 py-3 text-center">
+                  <p className="text-sm font-semibold text-exito">&#10003; Pagado</p>
+                  <p className="text-xs text-tinta-500 mt-1">Tu reserva esta confirmada</p>
+                </div>
               </div>
             )}
           </>
