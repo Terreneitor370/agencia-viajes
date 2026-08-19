@@ -87,6 +87,20 @@ module.exports = {
     [id],
   ),
 
+  /**
+   * Igual que findOtpChallenge pero por user_id: lo usa resetPassword(), que
+   * solo tiene el correo (nunca un challengeId) para no revelar antes si esa
+   * cuenta existe. "Vigente" ya filtra sin consumir y sin vencer en la
+   * consulta misma, asi que un desafio viejo no puede colarse por accidente.
+   */
+  findLatestOtpChallengeForUser: (userId) => db.queryOne(
+    `SELECT id, user_id, code_hash, attempts, expires_at, consumed_at
+       FROM login_otp_challenges
+      WHERE user_id = ? AND consumed_at IS NULL AND expires_at > NOW()
+      ORDER BY created_at DESC LIMIT 1`,
+    [userId],
+  ),
+
   incrementOtpAttempts: (id) => db.query(
     'UPDATE login_otp_challenges SET attempts = attempts + 1 WHERE id = ?', [id],
   ),

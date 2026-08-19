@@ -58,6 +58,12 @@ const COPYS = {
     descripcion: 'Ingresa este codigo para iniciar sesion en Viaja.',
     piePreventivo: 'Si tu no intentaste iniciar sesion, ignora este correo: tu cuenta sigue segura.',
   },
+  recuperacion: {
+    asunto: (codigo) => `${codigo} es tu codigo para restablecer tu contrasena en Viaja`,
+    titulo: 'Restablece tu contrasena',
+    descripcion: 'Ingresa este codigo para elegir una contrasena nueva.',
+    piePreventivo: 'Si tu no pediste esto, ignora este correo: tu contrasena actual sigue funcionando.',
+  },
 };
 
 /**

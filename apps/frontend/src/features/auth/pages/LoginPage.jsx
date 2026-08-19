@@ -43,8 +43,10 @@ export default function LoginPage() {
     const motivo = searchParams.get('oauth_error');
     return motivo ? (OAUTH_ERROR_MESSAGES[motivo] || OAUTH_ERROR_MESSAGES.fallo) : '';
   });
+  const [info, setInfo] = useState(() => (
+    location.state?.contrasenaRestablecida ? 'Tu contraseña se actualizo. Inicia sesion con la nueva.' : ''
+  ));
   const [busy, setBusy] = useState(false);
-  const [ayudaContrasena, setAyudaContrasena] = useState(false);
   const [challengeId, setChallengeId] = useState(null);
 
   const irA = location.state?.from?.pathname || '/viajes';
@@ -53,6 +55,7 @@ export default function LoginPage() {
     event.preventDefault();
     setBusy(true);
     setError('');
+    setInfo('');
     try {
       const resultado = await login(form);
       if (resultado?.mfaRequired) {
@@ -106,22 +109,19 @@ export default function LoginPage() {
               onChange={(event) => setForm({ ...form, password: event.target.value })}
               required
             />
-            <button
-              type="button"
-              onClick={() => setAyudaContrasena((v) => !v)}
-              className="mt-1.5 text-menor font-semibold text-azul-600 hover:underline"
+            <Link
+              to="/olvide-password"
+              className="mt-1.5 inline-block text-menor font-semibold text-azul-600 hover:underline"
             >
               ¿Olvidaste tu contraseña?
-            </button>
-            {ayudaContrasena && (
-              <p className="mt-1.5 text-menor text-tinta-500">
-                Por ahora no hay recuperacion automatica por correo. Pide a un administrador que revise tu cuenta.
-              </p>
-            )}
+            </Link>
           </div>
 
           {error && (
             <p role="alert" className="rounded-md bg-criticoSuave px-3 py-2 text-menor text-critico">{error}</p>
+          )}
+          {info && !error && (
+            <p role="status" className="rounded-md bg-exitoSuave px-3 py-2 text-menor text-exito">{info}</p>
           )}
 
           <Boton type="submit" variante="primario" anchoCompleto cargando={busy}>

@@ -14,6 +14,11 @@ export const authApi = {
   logout: () => api.post('/auth/logout'),
   me: () => api.get('/auth/me'),
   changePassword: (payload) => api.post('/auth/change-password', payload),
+  // Misma llamada sirve para pedir el primer codigo Y para reenviarlo: la
+  // respuesta es identica exista o no la cuenta, asi que no hay nada que
+  // "recordar" de la primera llamada para poder reenviar.
+  forgotPassword: (payload) => api.post('/auth/forgot-password', payload),
+  resetPassword: (payload) => api.post('/auth/reset-password', payload),
   // El flujo OAuth es una navegacion completa del navegador, no un fetch:
   // el intercambio del codigo ocurre en el backend.
   googleUrl: () => `${import.meta.env.VITE_API_URL || '/api/v1'}/auth/google`,

@@ -79,12 +79,14 @@ CREATE TABLE IF NOT EXISTS audit_log (
   CONSTRAINT fk_audit_actor FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
--- Codigo de un solo uso por correo (RF-A extendido, agosto 2026). Se abre al
--- registrarse (para confirmar que el correo es de quien se registro) y,
--- solo si esa verificacion nunca se completo, tambien en el siguiente login
--- con password correcto. Una cuenta ya verificada entra solo con
--- credenciales, el codigo no se vuelve a pedir. El codigo nunca se guarda en
--- claro: va con bcrypt (igual que password_hash), NO sha256 como
+-- Codigo de un solo uso por correo (RF-A extendido, agosto 2026). Se abre en
+-- tres casos: al registrarse (confirmar que el correo es de quien se
+-- registro), en el siguiente login si esa verificacion nunca se completo, y
+-- al pedir "olvide mi contrasena" (login_otp_challenges.user_id enlaza los
+-- tres; el "para que" se infiere en el codigo, no se guarda aqui). Una
+-- cuenta ya verificada entra solo con credenciales, el codigo no se vuelve a
+-- pedir. El codigo nunca se guarda en claro: va con bcrypt (igual que
+-- password_hash), NO sha256 como
 -- refresh_tokens. Con solo 1,000,000 de combinaciones posibles un hash
 -- rapido se rompe por fuerza bruta fuera de linea en milisegundos.
 CREATE TABLE IF NOT EXISTS login_otp_challenges (

@@ -73,6 +73,21 @@ exports.changePassword = async (req, res) => {
   return respond.noContent(res);
 };
 
+exports.forgotPassword = async (req, res) => {
+  await service.forgotPassword(req.body.email, req);
+  // Respuesta identica exista o no la cuenta: ver el comentario en el servicio.
+  return respond.ok(res, { message: 'Si el correo tiene una cuenta, te enviamos un codigo para restablecer la contrasena.' });
+};
+
+exports.resetPassword = async (req, res) => {
+  await service.resetPassword(req.body, req);
+  // Por si acaso hubiera cookies de una sesion vieja en este navegador: la
+  // contrasena cambio, esa sesion ya no deberia seguir viendose como valida.
+  res.clearCookie('access_token', { path: '/' });
+  res.clearCookie('refresh_token', { path: '/api/v1/auth/refresh' });
+  return respond.noContent(res);
+};
+
 /**
  * Inicio del flujo OAuth. El `state` es el token anti-CSRF del flujo: se guarda
  * en una cookie httpOnly de corta vida y se compara al volver. Sin esta

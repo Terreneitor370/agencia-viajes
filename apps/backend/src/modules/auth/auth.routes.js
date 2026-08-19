@@ -27,6 +27,12 @@ router.post('/refresh', authLimiter, asyncHandler(controller.refresh));
 router.post('/logout', authenticate, asyncHandler(controller.logout));
 router.get('/me', authenticate, asyncHandler(controller.me));
 router.post('/change-password', authenticate, writeLimiter, validate({ body: schemas.changePasswordSchema }), asyncHandler(controller.changePassword));
+// "Olvide mi contrasena": publicas por definicion (la persona no tiene
+// sesion). forgotPassword() nunca revela si el correo existe, asi que
+// tambien sirve como su propio reenvio (pedirlo otra vez invalida el
+// desafio anterior y manda uno nuevo, ver auth.service.js).
+router.post('/forgot-password', authLimiter, validate({ body: schemas.forgotPasswordSchema }), asyncHandler(controller.forgotPassword));
+router.post('/reset-password', authLimiter, validate({ body: schemas.resetPasswordSchema }), asyncHandler(controller.resetPassword));
 
 // OAuth Google (Authorization Code + PKCE). El intercambio de codigo por token
 // ocurre SOLO en el backend: el client_secret jamas toca el navegador.
@@ -121,6 +127,43 @@ const openapiPaths = {
         } } },
       },
       responses: { 204: { description: 'Contrasena actualizada' }, 401: { $ref: '#/components/responses/Unauthorized' } },
+    },
+  },
+  '/forgot-password': {
+    post: {
+      tags: ['auth'], summary: 'Solicita un codigo para restablecer la contrasena', security: [],
+      requestBody: {
+        required: true,
+        content: { 'application/json': { schema: {
+          type: 'object', required: ['email'],
+          properties: { email: { type: 'string', format: 'email' } },
+        } } },
+      },
+      responses: {
+        200: { description: 'Respuesta generica: no indica si el correo tiene cuenta o no' },
+        429: { $ref: '#/components/responses/RateLimited' },
+      },
+    },
+  },
+  '/reset-password': {
+    post: {
+      tags: ['auth'], summary: 'Cambia la contrasena usando el codigo de recuperacion', security: [],
+      requestBody: {
+        required: true,
+        content: { 'application/json': { schema: {
+          type: 'object', required: ['email', 'code', 'newPassword'],
+          properties: {
+            email: { type: 'string', format: 'email' },
+            code: { type: 'string', pattern: '^\\d{6}$' },
+            newPassword: { type: 'string', minLength: 12 },
+          },
+        } } },
+      },
+      responses: {
+        204: { description: 'Contrasena actualizada, todas las sesiones anteriores quedaron revocadas' },
+        401: { $ref: '#/components/responses/Unauthorized' },
+        429: { $ref: '#/components/responses/RateLimited' },
+      },
     },
   },
   '/google': {

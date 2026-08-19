@@ -139,13 +139,14 @@ async function startOtpChallenge(user, req) {
 }
 
 /**
- * Verifica el codigo (de registro o de login) y, si es correcto, emite la
- * sesion real. Confirmar cualquier codigo prueba que el correo es de quien
- * lo esta usando, asi que aqui tambien se marca email_verified_at si hacia
- * falta, sin importar cual de los dos flujos abrio el desafio.
+ * Nucleo compartido de verificacion: valida un desafio ya localizado contra
+ * el codigo recibido (intentos, expiracion, hash) y devuelve el usuario si es
+ * correcto. Lo usan verifyOtp() (que despues emite sesion) y resetPassword()
+ * (que despues cambia la contrasena en vez de iniciar sesion) — confirmar
+ * CUALQUIER codigo prueba que el correo es de quien lo esta usando, asi que
+ * aqui tambien se marca email_verified_at si hacia falta.
  */
-async function verifyOtp(challengeId, code, req) {
-  const challenge = await repo.findOtpChallenge(challengeId);
+async function verifyChallengeCode(challenge, code, req) {
   const invalido = () => ApiError.unauthorized('Codigo invalido o vencido');
 
   if (!challenge || challenge.consumed_at || new Date(challenge.expires_at) < new Date()) {
@@ -157,18 +158,25 @@ async function verifyOtp(challengeId, code, req) {
   }
 
   if (!(await bcrypt.compare(code, challenge.code_hash))) {
-    await repo.incrementOtpAttempts(challengeId);
+    await repo.incrementOtpAttempts(challenge.id);
     logger.security('OTP_FAILED', { userId: challenge.user_id, ip: req.ip });
     await audit.record('auth.otp.failed', { req, entity: 'user', entityId: challenge.user_id });
     throw invalido();
   }
 
-  await repo.consumeOtpChallenge(challengeId);
+  await repo.consumeOtpChallenge(challenge.id);
   const user = await repo.findById(challenge.user_id);
   if (!user || user.status !== 'active') throw invalido();
 
   await repo.markEmailVerified(user.id);
   await audit.record('auth.otp.verified', { req, entity: 'user', entityId: user.id });
+  return user;
+}
+
+/** Verifica el codigo (de registro o de login) y, si es correcto, emite la sesion real. */
+async function verifyOtp(challengeId, code, req) {
+  const challenge = await repo.findOtpChallenge(challengeId);
+  const user = await verifyChallengeCode(challenge, code, req);
   return issueSession(user);
 }
 
@@ -181,6 +189,67 @@ async function resendOtp(challengeId, req) {
   const user = await repo.findById(challenge.user_id);
   if (!user || user.status !== 'active') throw ApiError.unauthorized('Esta sesion de acceso ya no es valida, inicia sesion de nuevo');
   return startOtpChallenge(user, req);
+}
+
+/**
+ * "Olvide mi contrasena". Nunca revela si el correo existe: la respuesta es
+ * identica pase lo que pase, y el envio de correo NO se espera (fire and
+ * forget) para que tampoco el tiempo de respuesta lo delate — a diferencia de
+ * startOtpChallenge(), que si espera el envio porque ahi la persona ya esta
+ * viendo la pantalla del codigo y necesita saber ya si no va a llegar.
+ * Pedirlo de nuevo con el mismo correo ES el mecanismo de reenvio: no hace
+ * falta un endpoint aparte.
+ */
+async function forgotPassword(email, req) {
+  const user = await repo.findByEmail(email);
+  if (user && user.password_hash) {
+    enviarCodigoRecuperacion(user, req).catch((err) => {
+      logger.warn('No se pudo enviar el codigo de recuperacion', { message: err.message });
+    });
+  }
+  await audit.record('auth.password.reset_requested', {
+    req, entity: 'user', entityId: user?.id, meta: { email },
+  });
+}
+
+async function enviarCodigoRecuperacion(user, req) {
+  await repo.invalidateOtpChallengesForUser(user.id);
+  const codigo = generarCodigoOtp();
+  const id = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + env.OTP_TTL_MINUTES * 60_000);
+  const codeHash = await bcrypt.hash(codigo, BCRYPT_ROUNDS);
+  await repo.createOtpChallenge({ id, userId: user.id, codeHash, expiresAt });
+
+  if (emailer.estaConfigurado()) {
+    await emailer.enviarCodigoAcceso(user.email, codigo, 'recuperacion');
+  } else {
+    // No hay rama "isProd lanza error" aqui como en startOtpChallenge: como la
+    // respuesta de forgotPassword() ya se mando (generica, sin esperar esto),
+    // no hay nada que "fallar" hacia el llamante en este punto.
+    logger.warn('SMTP no configurado: codigo de recuperacion de desarrollo, solo visible aqui', { challengeId: id, codigo });
+  }
+  await audit.record('auth.otp.sent', { req, entity: 'user', entityId: user.id });
+}
+
+/**
+ * Cambia la contrasena usando el codigo de recuperacion en vez de la
+ * contrasena actual (esa es justo la diferencia con changePassword: aqui la
+ * persona no la tiene). No hay challengeId: el codigo llega junto con el
+ * correo para poder localizar el desafio sin revelar antes si el correo
+ * tiene cuenta. Igual que changePassword, invalida todas las sesiones
+ * activas; a diferencia de verifyOtp, NO emite sesion nueva.
+ */
+async function resetPassword({ email, code, newPassword }, req) {
+  const invalido = () => ApiError.unauthorized('Codigo invalido o vencido');
+  const account = await repo.findByEmail(email);
+  if (!account || !account.password_hash) throw invalido();
+
+  const challenge = await repo.findLatestOtpChallengeForUser(account.id);
+  const user = await verifyChallengeCode(challenge, code, req);
+
+  await repo.updatePassword(user.id, await bcrypt.hash(newPassword, BCRYPT_ROUNDS));
+  await repo.revokeAllForUser(user.id);
+  await audit.record('auth.password.reset', { req, entity: 'user', entityId: user.id });
 }
 
 /** Emite access token + refresh token nuevos y persiste el hash del refresh. */
@@ -324,5 +393,5 @@ async function googleExchange(code, verifier, req) {
 
 module.exports = {
   register, login, refresh, logout, changePassword, googleExchange, issueSession, BCRYPT_ROUNDS,
-  verifyOtp, resendOtp,
+  verifyOtp, resendOtp, forgotPassword, resetPassword,
 };
