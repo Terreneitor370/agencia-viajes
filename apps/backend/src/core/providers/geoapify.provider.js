@@ -41,6 +41,7 @@ async function geocodeCity(city, countryCode) {
   url.searchParams.set('format', 'geojson');
   url.searchParams.set('limit', '1');
   if (countryCode) url.searchParams.set('filter', `countrycode:${countryCode.toLowerCase()}`);
+  url.searchParams.set('lang', 'es');
   url.searchParams.set('apiKey', requireKey());
 
   const data = await httpClient.request({
@@ -77,7 +78,7 @@ async function searchPlaces({ categories, lat, lon, radiusMeters = 8000, limit =
     return {
       provider: 'geoapify',
       externalId: p.place_id,
-      name: p.name || p.address_line1 || 'Sin nombre',
+      name: p.name_international?.es || p.name_international?.en || p.name || p.address_line1 || 'Sin nombre',
       address: p.formatted,
       categories: p.categories || [],
       lat: p.lat,
