@@ -17,10 +17,15 @@ no exponerlo en todas las interfaces del servidor compartido.
 ## 1. Primera vez: clonar y configurar
 
 ```bash
-cd /var/www/Terreneitor370
+cd ~
 git clone https://github.com/Terreneitor370/agencia-viajes.git
 cd agencia-viajes
 ```
+
+(el repo real de este despliegue quedo en `/home/terreneitor370/agencia-viajes`,
+no en `/var/www/...` como sugiere la guia generica -- `deploy/nginx.agencia-viajes.conf`
+ya apunta ahi. Si mueves el checkout de lugar, actualiza el `root` de ese
+archivo tambien.)
 
 Crea el archivo de entorno del backend a partir de la plantilla y llena los
 valores reales (secretos JWT nuevos, credenciales SMTP/Stripe/Duffel/Geoapify,
@@ -128,6 +133,20 @@ sudo mysql -e "DELETE FROM agencia_viajes.users WHERE email='prueba-despliegue@t
 
 ## 5. Nginx + SSL
 
+Nginx corre como el usuario `www-data`, no como tu usuario -- necesita
+permiso para ATRAVESAR cada carpeta del camino hasta `dist/` (no solo
+leerla). Como el repo quedo dentro de tu home (`/home/terreneitor370/...`),
+que por default en Ubuntu suele tener permisos `750` (nadie mas entra),
+dale paso explicito:
+
+```bash
+chmod o+x /home/terreneitor370
+```
+
+(esto NO hace publico el contenido de tu home, solo permite que otros
+procesos atraviesen la carpeta para llegar a una ruta especifica que ya
+conocen -- no pueden listar lo que hay adentro)
+
 ```bash
 sudo cp deploy/nginx.agencia-viajes.conf /etc/nginx/sites-available/agencia-viajes
 sudo ln -s /etc/nginx/sites-available/agencia-viajes /etc/nginx/sites-enabled/
@@ -135,6 +154,10 @@ sudo nginx -t
 sudo systemctl reload nginx
 sudo certbot --nginx -d agencia-viajes.idgs8-2.tech
 ```
+
+Si despues de esto el sitio da 403 Forbidden en vez de cargar, es
+justamente este tema de permisos -- revisa con
+`sudo -u www-data test -r /home/terreneitor370/agencia-viajes/apps/frontend/dist/index.html && echo OK || echo SIN PERMISO`.
 
 **Importante:** las cookies de sesion se marcan `Secure` en produccion
 (`env.isProd`), o sea que el login NO va a funcionar por HTTP plano. No
@@ -155,7 +178,7 @@ si no, Google rechaza el login con ese dominio.
 ## Actualizar tras el primer despliegue
 
 ```bash
-cd /var/www/Terreneitor370/agencia-viajes
+cd ~/agencia-viajes
 git pull
 npm run db:migrate -w apps/backend   # solo si hay migraciones nuevas
 npm run build -w apps/frontend       # solo si cambio el frontend
