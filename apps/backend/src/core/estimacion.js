@@ -29,6 +29,15 @@ const PRECIO_EXPERIENCIA_MXN = {
   'catering.bar': 300,
   'leisure.park': 0,
   natural: 0,
+  // Agregadas: cubrian solo 3 de los 6 intereses de experiences.schema.js
+  // (CATEGORY_MAP). "aventura", "vida_nocturna" y "compras" caian siempre al
+  // respaldo de 250 porque ninguna de sus categorias de Geoapify tenia
+  // entrada aqui -- lo reporto Kassie probando con esos dos intereses.
+  sport: 300,
+  'entertainment.activity_park': 450,
+  'adult.nightclub': 350,
+  'commercial.shopping_mall': 0,
+  'commercial.marketplace': 0,
 };
 
 const estimar = (tabla, categorias, respaldo) => {

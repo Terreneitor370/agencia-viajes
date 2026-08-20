@@ -217,7 +217,7 @@ export default function ExperiencesPage() {
           />
 
           <Campo
-            etiqueta="Resultados"
+            etiqueta="Cuantos mostrar"
             type="number"
             min={1}
             max={40}
