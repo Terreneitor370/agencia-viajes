@@ -84,11 +84,7 @@ export default function CheckoutPage() {
   const [paid, setPaid] = useState(false);
 
   useEffect(() => {
-    if (!tripId) {
-      setError('Falta el viaje para pagar.');
-      setLoading(false);
-      return;
-    }
+    if (!tripId) return;
     let cancelled = false;
     paymentsApi.createPaymentIntent({ tripId, currency })
       .then((res) => {
@@ -107,7 +103,10 @@ export default function CheckoutPage() {
     return () => { cancelled = true; };
   }, [tripId, currency]);
 
-  if (loading) {
+  const errorMessage = !tripId ? 'Falta el viaje para pagar.' : error;
+  const isLoading = Boolean(tripId) && loading;
+
+  if (isLoading) {
     return (
       <Tarjeta className="p-8 text-center max-w-lg mx-auto mt-8">
         <p className="text-tinta-500">Preparando pago...</p>
@@ -115,11 +114,11 @@ export default function CheckoutPage() {
     );
   }
 
-  if (error) {
+  if (errorMessage) {
     return (
       <Tarjeta className="p-8 text-center max-w-lg mx-auto mt-8 space-y-4">
         <h1 className="text-seccion text-tinta-900">No se pudo cargar el pago</h1>
-        <p className="text-cuerpo text-tinta-500">{error}</p>
+        <p className="text-cuerpo text-tinta-500">{errorMessage}</p>
         <Link to={tripId ? `/viajes/${tripId}` : '/viajes'} className="inline-block rounded-md bg-azul-600 px-4 py-2 text-sm font-medium text-white hover:bg-azul-700">
           Volver al viaje
         </Link>

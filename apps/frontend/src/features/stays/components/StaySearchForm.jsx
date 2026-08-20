@@ -25,7 +25,7 @@ export default function StaySearchForm({ onSearch, loading, defaultValues = {}, 
   const [dateError, setDateError] = useState('');
   const [cityError, setCityError] = useState('');
 
-  const CITY_RE = /^[a-zA-ZáéíóúñüÁÉÍÓÚÑÜ\s.\-]+$/;
+  const CITY_RE = /^[a-zA-ZáéíóúñüÁÉÍÓÚÑÜ\s.-]+$/;
 
   const handleSubmit = (e) => {
     e.preventDefault();

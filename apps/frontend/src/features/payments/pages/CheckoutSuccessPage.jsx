@@ -16,10 +16,7 @@ export default function CheckoutSuccessPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!sessionId) {
-      setLoading(false);
-      return;
-    }
+    if (!sessionId) return;
     let cancelled = false;
     let attempts = 0;
     const maxAttempts = 10;
@@ -42,7 +39,9 @@ export default function CheckoutSuccessPage() {
     return () => { cancelled = true; };
   }, [sessionId]);
 
-  if (loading && !order) {
+  const isLoading = Boolean(sessionId) && loading;
+
+  if (isLoading && !order) {
     return (
       <Tarjeta className="p-8 text-center">
         <p className="text-tinta-500">Verificando pago...</p>
