@@ -1,6 +1,6 @@
 /** DUENO: Jeshua (modulo C). */
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Boton from '../../../components/ui/Boton';
 import Campo from '../../../components/ui/Campo';
 import Distintivo, { PrecioEstimado } from '../../../components/ui/Distintivo';
@@ -23,6 +23,7 @@ const normalizeTrip = (trip) => ({
   id: trip.id,
   title: trip.title,
   destinationCity: trip.destination_city ?? trip.destinationCity,
+  isPaid: Boolean(trip.is_paid ?? trip.isPaid),
 });
 
 const normalizeExperience = (row, index) => ({
@@ -38,11 +39,22 @@ const normalizeExperience = (row, index) => ({
   estimated: Boolean(row.price?.estimated ?? true),
 });
 
+const fitText = (value, max) => {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  return text.length <= max ? text : text.slice(0, max);
+};
+
 export default function ExperiencesPage() {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
-  const [city, setCity] = useState('Oaxaca');
+  const flowTripId = searchParams.get('tripId') || '';
+  const flowEnabled = searchParams.get('flow') === 'create' && Boolean(flowTripId);
+  const seededCity = searchParams.get('city') || 'Oaxaca';
+
+  const [city, setCity] = useState(seededCity);
   const [radiusKm, setRadiusKm] = useState(10);
   const [limit, setLimit] = useState(9);
   const [interests, setInterests] = useState(['cultura', 'gastronomia']);
@@ -55,9 +67,21 @@ export default function ExperiencesPage() {
   const [degraded, setDegraded] = useState(false);
 
   const [trips, setTrips] = useState([]);
-  const [tripId, setTripId] = useState('');
+  const [tripId, setTripId] = useState(flowTripId);
   const [addingId, setAddingId] = useState('');
   const [addedByTrip, setAddedByTrip] = useState({});
+  const autoSearchDone = useRef(false);
+
+  const autoSearchPayload = useMemo(() => {
+    const cityFromQuery = searchParams.get('city');
+    if (!cityFromQuery) return null;
+    return {
+      city: cityFromQuery,
+      interests,
+      radiusKm: Number(radiusKm),
+      limit: Number(limit),
+    };
+  }, [searchParams, interests, radiusKm, limit]);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,8 +97,13 @@ export default function ExperiencesPage() {
         const res = await tripsApi.list({ page: 1, pageSize: 50 });
         if (cancelled) return;
         const rows = Array.isArray(res.data) ? res.data.map(normalizeTrip) : [];
-        setTrips(rows);
-        setTripId((prev) => prev || rows[0]?.id || '');
+        const editableRows = rows.filter((row) => !row.isPaid);
+        setTrips(editableRows);
+        setTripId((prev) => {
+          if (flowTripId && editableRows.some((row) => row.id === flowTripId)) return flowTripId;
+          if (prev && editableRows.some((row) => row.id === prev)) return prev;
+          return editableRows[0]?.id || '';
+        });
       } catch {
         if (cancelled) return;
         setTrips([]);
@@ -86,29 +115,19 @@ export default function ExperiencesPage() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, flowTripId]);
 
-  const toggleInterest = (interest) => {
-    setInterests((prev) => {
-      if (prev.includes(interest)) {
-        return prev.length === 1 ? prev : prev.filter((item) => item !== interest);
-      }
-      return [...prev, interest];
-    });
-  };
-
-  const onSearch = async (event) => {
-    event.preventDefault();
+  const runSearch = useCallback(async ({ cityValue = city, interestsValue = interests, radiusValue = radiusKm, limitValue = limit } = {}) => {
     setBusy(true);
     setError('');
     setSearched(true);
 
     try {
       const res = await experiencesApi.search({
-        city,
-        interests,
-        radiusKm: Number(radiusKm),
-        limit: Number(limit),
+        city: cityValue,
+        interests: interestsValue,
+        radiusKm: Number(radiusValue),
+        limit: Number(limitValue),
       });
 
       setLocation(res.location || null);
@@ -122,6 +141,32 @@ export default function ExperiencesPage() {
     } finally {
       setBusy(false);
     }
+  }, [city, interests, radiusKm, limit]);
+
+  useEffect(() => {
+    if (!autoSearchPayload || autoSearchDone.current) return;
+    autoSearchDone.current = true;
+    setCity(autoSearchPayload.city);
+    runSearch({
+      cityValue: autoSearchPayload.city,
+      interestsValue: autoSearchPayload.interests,
+      radiusValue: autoSearchPayload.radiusKm,
+      limitValue: autoSearchPayload.limit,
+    });
+  }, [autoSearchPayload, runSearch]);
+
+  const toggleInterest = (interest) => {
+    setInterests((prev) => {
+      if (prev.includes(interest)) {
+        return prev.length === 1 ? prev : prev.filter((item) => item !== interest);
+      }
+      return [...prev, interest];
+    });
+  };
+
+  const onSearch = async (event) => {
+    event.preventDefault();
+    runSearch();
   };
 
   const addToTrip = async (experience) => {
@@ -142,11 +187,15 @@ export default function ExperiencesPage() {
     setError('');
 
     try {
+      const provider = fitText(experience.provider || 'geoapify', 40) || 'geoapify';
+      const externalId = fitText(experience.externalId, 120) || null;
+      const title = fitText(experience.name, 160) || 'Experiencia sin nombre';
+
       await tripsApi.addItem(tripId, {
         type: 'experience',
-        provider: experience.provider,
-        externalId: experience.externalId,
-        title: experience.name,
+        provider,
+        externalId,
+        title,
         unitPriceCents: Math.round(experience.priceAmount * 100),
         currency: experience.currency,
         pricingMode: experience.pricingMode,
@@ -174,6 +223,12 @@ export default function ExperiencesPage() {
         <p className="mt-1 text-cuerpo text-tinta-500">
           Elige tus intereses. Los precios son una estimacion por persona salvo que se indique lo contrario.
         </p>
+
+        {flowEnabled && (
+          <p className="mt-3 rounded-md border border-azul-200 bg-azul-50 px-3 py-2 text-menor text-azul-800">
+            Paso 3 de 3: agrega experiencias para cerrar tu itinerario en {city}.
+          </p>
+        )}
 
         <div className="mt-4 flex flex-wrap gap-2">
           {INTERESES.map((interest) => {
@@ -250,7 +305,7 @@ export default function ExperiencesPage() {
             >
               {trips.map((trip) => (
                 <option key={trip.id} value={trip.id}>
-                  {trip.title} · {trip.destinationCity}
+                  {trip.title} · {trip.destinationCity || 'Destino por definir'}
                 </option>
               ))}
             </select>

@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 const clamp = (n, min, max) => Math.min(max, Math.max(min, Number.isNaN(n) ? min : n));
 
-export default function StaySearchForm({ onSearch, loading, defaultCity = '', onCurrencyChange }) {
+export default function StaySearchForm({ onSearch, loading, defaultValues = {}, onCurrencyChange }) {
   // Fechas para el input date
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
@@ -13,13 +13,13 @@ export default function StaySearchForm({ onSearch, loading, defaultCity = '', on
   const maxDateStr = maxDate.toISOString().split('T')[0];
 
   const [form, setForm] = useState({
-    city: defaultCity,
-    checkIn: '',
-    checkOut: '',
-    travelers: 1,
-    radiusKm: 8,
-    limit: 20,
-    currency: 'MXN',
+    city: defaultValues.city || '',
+    checkIn: defaultValues.checkIn || '',
+    checkOut: defaultValues.checkOut || '',
+    travelers: clamp(Number(defaultValues.travelers), 1, 20),
+    radiusKm: defaultValues.radiusKm ?? 8,
+    limit: defaultValues.limit ?? 20,
+    currency: defaultValues.currency || 'MXN',
   });
 
   const [dateError, setDateError] = useState('');

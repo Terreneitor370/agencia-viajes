@@ -1,11 +1,18 @@
 /** Servicio de pagos con Stripe. DUENO: Kassie (modulo B). */
 const crypto = require('node:crypto');
-const stripe = require('stripe')(require('../../config/env').STRIPE_SECRET_KEY);
+const env = require('../../config/env');
+const stripe = env.STRIPE_SECRET_KEY ? require('stripe')(env.STRIPE_SECRET_KEY) : null;
 const db = require('../../core/db');
 const ApiError = require('../../core/ApiError');
 const logger = require('../../core/logger');
 
-const FRONTEND_URL = require('../../config/env').FRONTEND_URL || 'http://localhost:5173';
+const FRONTEND_URL = env.FRONTEND_URL || 'http://localhost:5173';
+
+function assertStripeConfigured() {
+  if (!stripe) {
+    throw ApiError.badRequest('Pagos no configurados: falta STRIPE_SECRET_KEY en apps/backend/.env');
+  }
+}
 
 /**
  * Calcula el total de un viaje a partir de sus trip_items (misma logica que budget.engine.js).
@@ -35,6 +42,8 @@ function nightsBetween(a, b) {
  * Crea una orden y una sesion de Stripe Checkout.
  */
 async function createCheckoutSession(userId, tripId, currency) {
+  assertStripeConfigured();
+
   const trip = await db.queryOne(
     'SELECT * FROM trips WHERE id = ? AND user_id = ? AND deleted_at IS NULL',
     [tripId, userId],
@@ -111,9 +120,9 @@ async function createCheckoutSession(userId, tripId, currency) {
  * Maneja el webhook de Stripe. Verifica la firma y actualiza el estado de la orden.
  */
 async function handleWebhook(rawBody, signature) {
-  const webhookSecret = require('../../config/env').STRIPE_WEBHOOK_SECRET;
-  if (!webhookSecret) {
-    logger.warn('STRIPE_WEBHOOK_SECRET no configurado, ignorando webhook');
+  const webhookSecret = env.STRIPE_WEBHOOK_SECRET;
+  if (!stripe || !webhookSecret) {
+    logger.warn('Stripe no configurado por completo, ignorando webhook');
     return;
   }
 
@@ -162,7 +171,7 @@ async function getOrderStatus(orderId, userId) {
   );
   if (!order) throw ApiError.notFound('Orden no encontrada');
 
-  if (order.status === 'pending' && order.stripe_session_id) {
+  if (order.status === 'pending' && order.stripe_session_id && stripe) {
     try {
       const session = await stripe.checkout.sessions.retrieve(order.stripe_session_id);
       if (session.payment_status === 'paid') {
@@ -195,7 +204,7 @@ async function getOrderBySession(sessionId, userId) {
   );
   if (!order) throw ApiError.notFound('Orden no encontrada');
 
-  if (order.status === 'pending' && order.stripe_session_id) {
+  if (order.status === 'pending' && order.stripe_session_id && stripe) {
     try {
       const session = await stripe.checkout.sessions.retrieve(order.stripe_session_id);
       if (session.payment_status === 'paid') {
@@ -238,6 +247,8 @@ async function listOrders(userId, tripId) {
  * Devuelve clientSecret para que el frontend confirme el pago con CardElement.
  */
 async function createPaymentIntent(userId, tripId, currency) {
+  assertStripeConfigured();
+
   const trip = await db.queryOne(
     'SELECT * FROM trips WHERE id = ? AND user_id = ? AND deleted_at IS NULL',
     [tripId, userId],
@@ -308,7 +319,7 @@ async function confirmOrder(orderId, userId) {
 
   if (order.status === 'paid') return order;
 
-  if (order.stripe_session_id) {
+  if (order.stripe_session_id && stripe) {
     try {
       const pi = await stripe.paymentIntents.retrieve(order.stripe_session_id);
       if (pi.status === 'succeeded') {

@@ -3,7 +3,10 @@
  * El servidor NO arranca si falta una variable critica (OWASP A05: Security Misconfiguration).
  * DUENO: core (compartido) - cambios requieren PR con label `core`.
  */
-require('dotenv').config();
+const path = require('node:path');
+
+// Carga SIEMPRE el .env del backend, aunque el proceso se ejecute desde la raiz del monorepo.
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 const { z } = require('zod');
 
 const schema = z.object({

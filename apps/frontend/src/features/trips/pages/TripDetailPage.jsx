@@ -1,7 +1,8 @@
 /** DUENO: Jeshua (modulo C). */
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { PrecioEstimado } from '../../../components/ui/Distintivo';
+import Boton from '../../../components/ui/Boton';
+import Distintivo, { PrecioEstimado } from '../../../components/ui/Distintivo';
 import PildoraEscala, { MultiplicadorEscala } from '../../../components/ui/PildoraEscala';
 import Tarjeta, { EncabezadoSeccion } from '../../../components/ui/Tarjeta';
 import {
@@ -11,6 +12,7 @@ import {
   habitacionesPara,
   plural,
 } from '../../../core/utils/formato';
+import { paymentsApi } from '../../payments/api';
 import BudgetPanel from '../../budget/components/BudgetPanel';
 import { tripsApi } from '../api';
 
@@ -77,8 +79,14 @@ const normalizeTrip = (trip) => ({
   travelers: Number(trip.travelers || 1),
   currency: trip.currency || 'MXN',
   budgetLimit: trip.budget_limit ?? trip.budgetLimit ?? null,
+  isPaid: Boolean(trip.is_paid ?? trip.isPaid),
   items: Array.isArray(trip.items) ? trip.items.map(normalizeItem) : [],
 });
+
+const hasPaidOrder = (data) => {
+  const rows = Array.isArray(data) ? data : data ? [data] : [];
+  return rows.some((row) => row?.status === 'paid');
+};
 
 // Este subtotal es informativo para la tabla. El total oficial siempre viene del backend.
 const subtotalItem = (item, tripStats) => {
@@ -94,9 +102,21 @@ const subtotalItem = (item, tripStats) => {
   }
 };
 
-function ItineraryRow({ item, tripStats, defaultCurrency }) {
+function ItineraryRow({ item, tripStats, defaultCurrency, showRemove = false, removing = false, onRemove }) {
   const currency = item.currency || defaultCurrency;
   const total = subtotalItem(item, tripStats);
+
+  const routeLabel = item.type === 'flight'
+    ? [item.meta?.originCity || item.meta?.originCode, item.meta?.destinationCity || item.meta?.destinationCode]
+      .filter(Boolean)
+      .join(' → ')
+    : '';
+
+  const placeLabel = (item.type === 'stay' || item.type === 'experience')
+    ? String(item.meta?.address || '').trim()
+    : '';
+
+  const detailLabel = routeLabel || placeLabel;
 
   return (
     <li className="border-b border-borde px-4 py-3 last:border-b-0">
@@ -106,10 +126,23 @@ function ItineraryRow({ item, tripStats, defaultCurrency }) {
           <p className="mt-0.5 text-menor text-tinta-500">
             x{item.quantity}
           </p>
+          {detailLabel && (
+            <p className="mt-1 text-menor text-tinta-500">{detailLabel}</p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {item.estimated && <PrecioEstimado />}
           <PildoraEscala modo={item.pricingMode} />
+          {showRemove && (
+            <Boton
+              variante="destructivo"
+              tamano="sm"
+              onClick={onRemove}
+              disabled={removing}
+            >
+              {removing ? 'Eliminando...' : 'Eliminar'}
+            </Boton>
+          )}
         </div>
       </div>
 
@@ -171,6 +204,8 @@ export default function TripDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [travelersBusy, setTravelersBusy] = useState(false);
+  const [removingItemId, setRemovingItemId] = useState('');
+  const [paidByOrder, setPaidByOrder] = useState(false);
   const [viewMode, setViewMode] = useState('type');
 
   useEffect(() => {
@@ -180,18 +215,21 @@ export default function TripDetailPage() {
       setLoading(true);
       setError('');
       try {
-        const [detailRes, budgetRes] = await Promise.all([
+        const [detailRes, budgetRes, ordersRes] = await Promise.all([
           tripsApi.detail(id),
           tripsApi.budget(id),
+          paymentsApi.listOrders({ trip_id: id }).catch(() => null),
         ]);
         if (cancelled) return;
         setTrip(normalizeTrip(detailRes.data));
         setBudget(budgetRes.data);
+        setPaidByOrder(hasPaidOrder(ordersRes?.data));
       } catch (err) {
         if (cancelled) return;
         setError(err.message || 'No fue posible cargar el viaje.');
         setTrip(null);
         setBudget(null);
+        setPaidByOrder(false);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -202,6 +240,20 @@ export default function TripDetailPage() {
       cancelled = true;
     };
   }, [id]);
+
+  const tripIsPaid = Boolean(trip?.isPaid || paidByOrder);
+
+  const refreshPaidLock = async () => {
+    if (!trip?.id) return false;
+    try {
+      const ordersRes = await paymentsApi.listOrders({ trip_id: trip.id });
+      const paid = hasPaidOrder(ordersRes.data);
+      setPaidByOrder(paid);
+      return paid;
+    } catch {
+      return false;
+    }
+  };
 
   const tripStats = useMemo(() => {
     if (!trip) {
@@ -265,6 +317,14 @@ export default function TripDetailPage() {
 
   const onTravelersChange = async (value) => {
     if (!trip) return;
+    if (tripIsPaid) {
+      setError('Este viaje ya fue pagado y no admite cambios.');
+      return;
+    }
+    if (await refreshPaidLock()) {
+      setError('Este viaje ya fue pagado y no admite cambios.');
+      return;
+    }
     const next = Math.max(1, Math.min(20, Number(value) || 1));
     if (next === trip.travelers) return;
 
@@ -281,6 +341,33 @@ export default function TripDetailPage() {
       setError(err.message || 'No fue posible recalcular el presupuesto.');
     } finally {
       setTravelersBusy(false);
+    }
+  };
+
+  const onRemoveExperience = async (itemId) => {
+    if (!trip || !itemId || removingItemId) return;
+    if (tripIsPaid) {
+      setError('Este viaje ya fue pagado y no admite cambios.');
+      return;
+    }
+    if (await refreshPaidLock()) {
+      setError('Este viaje ya fue pagado y no admite cambios.');
+      return;
+    }
+
+    const previousItems = trip.items;
+    setError('');
+    setRemovingItemId(itemId);
+    setTrip((prev) => ({ ...prev, items: prev.items.filter((item) => item.id !== itemId) }));
+
+    try {
+      const res = await tripsApi.removeItem(trip.id, itemId);
+      setBudget(res.data);
+    } catch (err) {
+      setTrip((prev) => ({ ...prev, items: previousItems }));
+      setError(err.message || 'No fue posible eliminar la experiencia.');
+    } finally {
+      setRemovingItemId('');
     }
   };
 
@@ -310,6 +397,11 @@ export default function TripDetailPage() {
               {trip.originCity} - {trip.destinationCity} · {fechaCorta(trip.startDate)} - {fechaCorta(trip.endDate)}
               {' '}· {plural(trip.travelers, 'viajero', 'viajeros')}
             </p>
+            {tripIsPaid && (
+              <div className="mt-2">
+                <Distintivo tono="exito">Pagado · Edicion bloqueada</Distintivo>
+              </div>
+            )}
           </div>
 
           <div className="mt-3 inline-flex rounded-md border border-white/30 p-0.5 sm:mt-0">
@@ -369,6 +461,9 @@ export default function TripDetailPage() {
                     item={item}
                     tripStats={tripStats}
                     defaultCurrency={trip.currency}
+                    showRemove={section.type === 'experience' && !tripIsPaid}
+                    removing={removingItemId === item.id}
+                    onRemove={() => onRemoveExperience(item.id)}
                   />
                 ))}
               </ul>
@@ -388,6 +483,9 @@ export default function TripDetailPage() {
                     item={item}
                     tripStats={tripStats}
                     defaultCurrency={trip.currency}
+                    showRemove={item.type === 'experience' && !tripIsPaid}
+                    removing={removingItemId === item.id}
+                    onRemove={() => onRemoveExperience(item.id)}
                   />
                 ))}
               </ul>
@@ -410,6 +508,7 @@ export default function TripDetailPage() {
           busy={travelersBusy}
           tripId={trip.id}
           currency={trip.currency}
+          isReadOnly={tripIsPaid}
           className="lg:sticky lg:top-4"
         />
       </div>

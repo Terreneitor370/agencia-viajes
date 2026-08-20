@@ -5,7 +5,6 @@
  * llega de la API y envia cambios de viajeros.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import Distintivo from '../../../components/ui/Distintivo';
 import { dinero } from '../../../core/utils/formato';
 import { paymentsApi } from '../../payments/api';
@@ -61,7 +60,9 @@ function Breakdown({ budget, currency }) {
   );
 }
 
-function TravelersControl({ travelers, onChange, busy }) {
+function TravelersControl({ travelers, onChange, busy, disabled = false }) {
+  const locked = busy || disabled;
+
   return (
     <div>
       <div className="flex items-center justify-between gap-3">
@@ -72,7 +73,7 @@ function TravelersControl({ travelers, onChange, busy }) {
             onClick={() => onChange(travelers - 1)}
             className="h-6 w-6 rounded border border-borde text-tinta-700 hover:bg-lienzo"
             aria-label="Disminuir viajeros"
-            disabled={busy}
+            disabled={locked}
           >
             -
           </button>
@@ -82,7 +83,7 @@ function TravelersControl({ travelers, onChange, busy }) {
             onClick={() => onChange(travelers + 1)}
             className="h-6 w-6 rounded border border-borde text-tinta-700 hover:bg-lienzo"
             aria-label="Aumentar viajeros"
-            disabled={busy}
+            disabled={locked}
           >
             +
           </button>
@@ -94,18 +95,26 @@ function TravelersControl({ travelers, onChange, busy }) {
         min={1}
         max={20}
         value={travelers}
-        disabled={busy}
+        disabled={locked}
         onChange={(event) => onChange(event.target.value)}
         className="mt-2 h-2 w-full cursor-pointer appearance-none rounded-full bg-lienzo accent-azul-600 disabled:cursor-not-allowed"
       />
 
       {busy && <p className="mt-1 text-menor text-tinta-500">Recalculando...</p>}
+      {!busy && disabled && <p className="mt-1 text-menor text-tinta-500">Bloqueado por pago confirmado.</p>}
     </div>
   );
 }
 
-function BudgetContent({ budget, travelers, onChangeTravelers, busy, tripId, currency: currencyProp }) {
-  const navigate = useNavigate();
+function BudgetContent({
+  budget,
+  travelers,
+  onChangeTravelers,
+  busy,
+  tripId,
+  currency: currencyProp,
+  isReadOnly = false,
+}) {
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState('');
   const [orderStatus, setOrderStatus] = useState(null);
@@ -118,7 +127,7 @@ function BudgetContent({ budget, travelers, onChangeTravelers, busy, tripId, cur
   const nearLimit = hasLimit && !budget?.overBudget && pct >= 90;
   const remaining = Number(budget?.remaining || 0);
   const hasItems = budget && budget.total > 0;
-  const isPaid = orderStatus === 'paid';
+  const isPaid = isReadOnly || orderStatus === 'paid';
 
   useEffect(() => {
     if (!tripId) return;
@@ -156,7 +165,7 @@ function BudgetContent({ budget, travelers, onChangeTravelers, busy, tripId, cur
         <p className="text-menor text-tinta-500">{dinero(budget?.perPerson, currency)} por persona</p>
       </header>
 
-      <TravelersControl travelers={travelers} onChange={onChangeTravelers} busy={busy} />
+      <TravelersControl travelers={travelers} onChange={onChangeTravelers} busy={busy} disabled={isPaid} />
 
       <div className={busy ? 'opacity-60 transition-opacity duration-realce' : 'transition-opacity duration-realce'}>
         {!budget ? (
@@ -233,7 +242,16 @@ function BudgetContent({ budget, travelers, onChangeTravelers, busy, tripId, cur
   );
 }
 
-export default function BudgetPanel({ budget, travelers = 1, onChangeTravelers, busy = false, className = '', tripId, currency }) {
+export default function BudgetPanel({
+  budget,
+  travelers = 1,
+  onChangeTravelers,
+  busy = false,
+  className = '',
+  tripId,
+  currency,
+  isReadOnly = false,
+}) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const safeTravelers = clampTravelers(travelers);
 
@@ -261,6 +279,7 @@ export default function BudgetPanel({ budget, travelers = 1, onChangeTravelers, 
           busy={busy}
           tripId={tripId}
           currency={currency}
+          isReadOnly={isReadOnly}
         />
       </aside>
 
@@ -297,6 +316,7 @@ export default function BudgetPanel({ budget, travelers = 1, onChangeTravelers, 
               busy={busy}
               tripId={tripId}
               currency={currency}
+              isReadOnly={isReadOnly}
             />
           </div>
         )}
