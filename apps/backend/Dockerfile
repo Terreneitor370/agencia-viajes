@@ -1,12 +1,16 @@
 # Build context: raiz del monorepo (necesita el package-lock.json compartido
 # para resolver el workspace). Ver docker-compose.yml -> build.context.
 #
-# Se conserva la forma real del monorepo (/app/apps/backend) en vez de
-# aplanarla: asi la resolucion de node_modules de npm workspaces (que hoistea
-# dependencias compartidas a la raiz) funciona igual que en local, sin
-# adivinar que quedo hoisteado y que no.
-FROM node:22-alpine AS deps
+# Una sola etapa a proposito: ninguna dependencia de este proyecto compila
+# nativo (bcryptjs y mysql2 son JS puro), asi que un build multi-stage no
+# ahorraba nada real y en cambio obligaba a copiar node_modules entre
+# etapas adivinando donde npm workspaces decide dejar cada paquete (root vs.
+# apps/backend/node_modules). Con una sola etapa ese problema desaparece:
+# todo queda en el mismo filesystem desde el "npm ci".
+FROM node:22-alpine
+ENV NODE_ENV=production
 WORKDIR /app
+
 COPY package.json package-lock.json ./
 # Se copian los package.json de TODOS los workspaces, no solo backend: el
 # package-lock.json es del monorepo completo y npm ci valida contra la
@@ -16,11 +20,6 @@ COPY apps/backend/package.json apps/backend/package.json
 COPY apps/frontend/package.json apps/frontend/package.json
 RUN npm ci --workspace=apps/backend --omit=dev
 
-FROM node:22-alpine AS runtime
-ENV NODE_ENV=production
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY apps/backend/package.json apps/backend/package.json
 COPY apps/backend/src apps/backend/src
 COPY apps/backend/scripts apps/backend/scripts
 COPY apps/backend/db apps/backend/db
