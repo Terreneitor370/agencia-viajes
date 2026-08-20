@@ -23,26 +23,47 @@ nano apps/backend/.env.production
 
 ## 2. Base de datos: usuario y BD dedicados a este proyecto
 
-**No reutilices el usuario root del MySQL compartido.** Crea un usuario que
-solo pueda tocar la base de este proyecto, para no arriesgar los proyectos de
-los demas compañeros en el mismo VPS:
+Primero confirma en QUE puerto escucha el MySQL de este VPS -- no lo
+asumas, cada servidor puede tener el suyo:
 
-```sql
-CREATE DATABASE agencia_viajes CHARACTER SET utf8mb4;
-CREATE USER 'agencia_viajes_app'@'localhost' IDENTIFIED BY 'una-contrasena-fuerte-unica';
-GRANT ALL PRIVILEGES ON agencia_viajes.* TO 'agencia_viajes_app'@'localhost';
-FLUSH PRIVILEGES;
+```bash
+sudo ss -tulpn | grep mysql
 ```
 
-Usa ese usuario/contraseña en `DB_USER`/`DB_PASSWORD` de
-`apps/backend/.env.production`. `DB_HOST` no se toca ahi -- lo fija
-`docker-compose.yml` a `host.docker.internal` para que el contenedor
-alcance el MySQL del host.
+Anota el puerto que te muestre (probablemente 3306, pero verifica).
+
+**No reutilices el usuario root del MySQL compartido.** Entra al cliente de
+MySQL (root normalmente no pide password si usas `sudo`; si `sudo mysql`
+no funciona, prueba `mysql -u root -p`):
+
+```bash
+sudo mysql
+```
+
+Ya DENTRO del prompt `mysql>` (no en bash), pega esto completo. Usa el MISMO
+nombre de usuario en las tres lineas que lo mencionan:
+
+```sql
+CREATE DATABASE IF NOT EXISTS agencia_viajes CHARACTER SET utf8mb4;
+CREATE USER IF NOT EXISTS 'agencia_viajes_app'@'localhost' IDENTIFIED BY 'una-contrasena-fuerte-unica';
+GRANT ALL PRIVILEGES ON agencia_viajes.* TO 'agencia_viajes_app'@'localhost';
+FLUSH PRIVILEGES;
+EXIT;
+```
+
+En `apps/backend/.env.production` llena `DB_USER`/`DB_PASSWORD` con ese
+usuario/contraseña, `DB_PORT` con el puerto que confirmaste arriba, y
+agrega tambien `DB_HOST=localhost` (o `127.0.0.1`).
+
+Ojo, esto es distinto de lo que corre DENTRO del contenedor: ahi
+`docker-compose.yml` sobreescribe `DB_HOST` a `host.docker.internal`
+automaticamente (ver paso 4), así que ese valor de `DB_HOST=localhost` en
+el archivo solo aplica al paso de migraciones de abajo, que corre
+directo con Node en el propio VPS, no en Docker.
 
 Aplica las migraciones (fuera de Docker, directo con Node -- estos scripts
-usan `apps/backend/.env`, asi que corren apuntando al mismo `.env.production`
-si lo copias/enlazas como `.env`, o exporta las mismas variables de entorno
-antes de correrlo):
+leen `apps/backend/.env`, no `.env.production` directamente, por eso se
+copia primero):
 
 ```bash
 cd apps/backend
@@ -51,6 +72,10 @@ npm ci
 npm run db:migrate
 cd ../..
 ```
+
+Si despues editas `.env.production` (por ejemplo para corregir un dato),
+vuelve a correr `cp .env.production .env` antes de repetir el
+`db:migrate` -- si no, sigue leyendo la copia vieja.
 
 ## 3. Build del frontend (estatico, fuera de Docker)
 
