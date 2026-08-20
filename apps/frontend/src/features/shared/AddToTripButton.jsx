@@ -45,29 +45,24 @@ export default function AddToTripButton({ item, type, tripId = '', onAdded }) {
   };
 
   const resolveTripId = async () => {
-    const tripsRes = await api.get('/trips');
-    const trips = tripsRes.data || [];
-
-    if (tripId) {
-      const selected = trips.find((trip) => trip.id === tripId);
-      if (!selected) {
-        setError('El viaje seleccionado no existe o ya no esta disponible.');
-        return '';
-      }
-      if (selected.is_paid ?? selected.isPaid) {
-        setError('Ese viaje ya fue pagado y no acepta cambios.');
-        return '';
-      }
-      return tripId;
-    }
-
-    const editableTrips = trips.filter((trip) => !(trip.is_paid ?? trip.isPaid));
-    if (editableTrips.length === 0) {
-      setError('No tienes viajes editables. Los viajes pagados no aceptan cambios.');
+    if (!tripId) {
+      setError('Selecciona primero el viaje destino desde el panel.');
       return '';
     }
 
-    return editableTrips[0].id;
+    const tripsRes = await api.get('/trips');
+    const trips = tripsRes.data || [];
+
+    const selected = trips.find((trip) => trip.id === tripId);
+    if (!selected) {
+      setError('El viaje seleccionado no existe o ya no esta disponible.');
+      return '';
+    }
+    if (selected.is_paid ?? selected.isPaid) {
+      setError('Ese viaje ya fue pagado y no acepta cambios.');
+      return '';
+    }
+    return tripId;
   };
 
   /** El POST real. Asume que ya hay sesion: la checa quien la llame. */
@@ -75,7 +70,8 @@ export default function AddToTripButton({ item, type, tripId = '', onAdded }) {
     const targetTripId = await resolveTripId();
     if (!targetTripId) return;
 
-    await api.post(`/trips/${targetTripId}/items`, construirPayload(item, type));
+    const created = await api.post(`/trips/${targetTripId}/items`, construirPayload(item, type));
+    const createdItemId = created?.data?.id || created?.id || '';
 
     if (type === 'flight') {
       const patch = tripPatchFromFlight(item);
@@ -89,7 +85,9 @@ export default function AddToTripButton({ item, type, tripId = '', onAdded }) {
     }
 
     setSuccess(true);
-    if (onAdded) onAdded(item, { tripId: targetTripId });
+    if (onAdded) {
+      Promise.resolve(onAdded(item, { tripId: targetTripId, itemId: createdItemId })).catch(() => {});
+    }
     setTimeout(() => setSuccess(false), 3000);
   };
 

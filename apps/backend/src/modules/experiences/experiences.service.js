@@ -3,6 +3,7 @@ const geoapify = require('../../core/providers/geoapify.provider');
 const { CATEGORY_MAP } = require('./experiences.schema');
 const { estimateExperiencePrice } = require('../../core/estimacion');
 const logger = require('../../core/logger');
+const ApiError = require('../../core/ApiError');
 
 function categoriesForInterests(interests) {
   const categories = interests
@@ -53,8 +54,9 @@ async function search({ city, countryCode, interests, radiusKm, limit }) {
       degraded: false,
     };
   } catch (err) {
+    if (err.status === 404) throw err;
     logger.warn('Proveedor de experiencias no disponible', { message: err.message });
-    return { location: null, experiences: [], degraded: true };
+    throw ApiError.upstream('No fue posible buscar experiencias en este momento. Intenta de nuevo.');
   }
 }
 

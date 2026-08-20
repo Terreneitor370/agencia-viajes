@@ -18,6 +18,9 @@ const OAUTH_ERROR_MESSAGES = {
   estado_invalido: 'Tu sesion con Google expiro, intenta de nuevo.',
   solicitud_invalida: 'No pudimos completar el inicio de sesion con Google.',
   correo_registrado: 'Ya existe una cuenta con este correo. Inicia sesion con tu contrasena.',
+  correo_no_verificado: 'Tu cuenta de Google no tiene correo verificado.',
+  cliente_oauth_invalido: 'La configuracion de Google OAuth no coincide con este cliente. Revisa Client ID y redirect URI.',
+  proveedor_google: 'Google no respondio correctamente al validar el inicio de sesion. Intenta de nuevo en un momento.',
   fallo: 'No fue posible iniciar sesion con Google. Intenta de nuevo.',
 };
 

@@ -1,6 +1,6 @@
 /** DUENO: Jeshua (modulo C). */
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import Boton from '../../../components/ui/Boton';
 import Distintivo, { PrecioEstimado } from '../../../components/ui/Distintivo';
 import PildoraEscala, { MultiplicadorEscala } from '../../../components/ui/PildoraEscala';
@@ -116,7 +116,11 @@ function ItineraryRow({ item, tripStats, defaultCurrency, showRemove = false, re
     ? String(item.meta?.address || '').trim()
     : '';
 
-  const detailLabel = routeLabel || placeLabel;
+  const reservationDateLabel = item.type === 'experience' && item.meta?.reservationDate
+    ? `Reservada para ${fechaCorta(item.meta.reservationDate)}`
+    : '';
+
+  const detailLabel = [routeLabel, placeLabel, reservationDateLabel].filter(Boolean).join(' · ');
 
   return (
     <li className="border-b border-borde px-4 py-3 last:border-b-0">
@@ -198,6 +202,7 @@ function EscalaConceptos({ tripStats }) {
 }
 
 export default function TripDetailPage() {
+  const navigate = useNavigate();
   const { id } = useParams();
   const [trip, setTrip] = useState(null);
   const [budget, setBudget] = useState(null);
@@ -371,6 +376,43 @@ export default function TripDetailPage() {
     }
   };
 
+  const onReplaceFlight = () => {
+    if (!trip || tripIsPaid) return;
+
+    const next = new URLSearchParams({
+      tripId: trip.id,
+      flow: 'replace',
+      replace: 'flight',
+      returnTo: `/viajes/${trip.id}`,
+      origin: trip.originCity || '',
+      destination: trip.destinationCity || '',
+      departureDate: trip.startDate || '',
+      returnDate: trip.endDate || '',
+      travelers: String(trip.travelers || 1),
+      currency: trip.currency || 'MXN',
+    });
+
+    navigate(`/buscar?${next.toString()}`);
+  };
+
+  const onReplaceStay = () => {
+    if (!trip || tripIsPaid) return;
+
+    const next = new URLSearchParams({
+      tripId: trip.id,
+      flow: 'replace',
+      replace: 'stay',
+      returnTo: `/viajes/${trip.id}`,
+      city: trip.destinationCity || '',
+      checkIn: trip.startDate || '',
+      checkOut: trip.endDate || '',
+      travelers: String(trip.travelers || 1),
+      currency: trip.currency || 'MXN',
+    });
+
+    navigate(`/hospedaje?${next.toString()}`);
+  };
+
   if (loading) {
     return (
       <Tarjeta className="p-6">
@@ -444,6 +486,19 @@ export default function TripDetailPage() {
         <p role="alert" className="rounded-md border border-critico/20 bg-criticoSuave px-3 py-2 text-menor text-critico">
           {error}
         </p>
+      )}
+
+      {!tripIsPaid && (
+        <Tarjeta className="p-4">
+          <p className="etiqueta-seccion">Actualizar reservaciones</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Boton variante="secundario" tamano="sm" onClick={onReplaceFlight}>Cambiar vuelo</Boton>
+            <Boton variante="secundario" tamano="sm" onClick={onReplaceStay}>Cambiar hospedaje</Boton>
+          </div>
+          <p className="mt-2 text-menor text-tinta-500">
+            Al guardar una nueva opcion, reemplazaremos la anterior y volveras automaticamente a este viaje.
+          </p>
+        </Tarjeta>
       )}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(310px,1fr)]">

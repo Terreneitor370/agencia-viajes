@@ -3,11 +3,13 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../../../core/auth/useAuth';
 import { flightsApi } from '../api';
 import { getRate, convertList } from '../../../core/api/rates';
 import FlightCard from '../components/FlightCard';
 import Hero from '../../shared/Hero';
 import PopularOptions from '../../shared/PopularOptions';
+import { tripsApi } from '../../trips/api';
 
 const HERO_IMAGE = 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=1600&q=60';
 
@@ -51,12 +53,27 @@ const RUTAS = [
   { key: 'gdl-cun', origin: 'GDL', destination: 'CUN', label: 'Guadalajara → Cancún', hint: 'Riviera Maya' },
 ];
 
+const normalizeTrip = (trip) => ({
+  id: trip.id,
+  title: trip.title,
+  destinationCity: trip.destination_city ?? trip.destinationCity,
+  isPaid: Boolean(trip.is_paid ?? trip.isPaid),
+});
+
 export default function SearchPage() {
+  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   const flowTripId = searchParams.get('tripId') || '';
-  const flowEnabled = searchParams.get('flow') === 'create' && Boolean(flowTripId);
+  const flowMode = searchParams.get('flow') || '';
+  const replaceTarget = searchParams.get('replace') || '';
+  const returnToParam = searchParams.get('returnTo') || '';
+  const flowEnabled = flowMode === 'create' && Boolean(flowTripId);
+  const replaceFlightFlow = flowMode === 'replace' && replaceTarget === 'flight' && Boolean(flowTripId);
+  const safeReturnTo = returnToParam.startsWith('/')
+    ? returnToParam
+    : (flowTripId ? `/viajes/${flowTripId}` : '/viajes');
   const seed = useMemo(() => ({
     origin: searchParams.get('origin') || '',
     destination: searchParams.get('destination') || '',
@@ -69,6 +86,8 @@ export default function SearchPage() {
   const [form, setForm] = useState(() => initialForm(seed));
   const [offers, setOffers] = useState([]);
   const [airports, setAirports] = useState([]);
+  const [trips, setTrips] = useState([]);
+  const [tripId, setTripId] = useState(flowTripId);
   const [state, setState] = useState({ busy: false, error: '', degraded: false, searched: false });
 
   useEffect(() => {
@@ -78,6 +97,40 @@ export default function SearchPage() {
       .catch(() => { if (mounted) setAirports([]); });
     return () => { mounted = false; };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadTrips = async () => {
+      if (!isAuthenticated) {
+        setTrips([]);
+        setTripId(flowTripId || '');
+        return;
+      }
+
+      try {
+        const res = await tripsApi.list({ page: 1, pageSize: 50 });
+        if (cancelled) return;
+        const rows = Array.isArray(res.data) ? res.data.map(normalizeTrip) : [];
+        const editableRows = rows.filter((row) => !row.isPaid);
+        setTrips(editableRows);
+        setTripId((prev) => {
+          if (flowTripId && editableRows.some((row) => row.id === flowTripId)) return flowTripId;
+          if (prev && editableRows.some((row) => row.id === prev)) return prev;
+          return editableRows[0]?.id || '';
+        });
+      } catch {
+        if (cancelled) return;
+        setTrips([]);
+        setTripId(flowTripId || '');
+      }
+    };
+
+    loadTrips();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, flowTripId]);
 
   const cityByIata = useMemo(() => Object.fromEntries(
     airports
@@ -166,7 +219,35 @@ export default function SearchPage() {
     setForm((f) => ({ ...f, origin, destination }));
   };
 
-  const onFlightAdded = (offer) => {
+  const onFlightAdded = (offer, context = {}) => {
+    const targetTripId = context.tripId || tripId || flowTripId;
+    if (!targetTripId) return;
+
+    if (replaceFlightFlow) {
+      const replaceCurrentFlight = async () => {
+        if (!context.itemId) {
+          throw new Error('No se pudo confirmar el nuevo vuelo. Intenta de nuevo.');
+        }
+
+        const detailRes = await tripsApi.detail(targetTripId);
+        const items = Array.isArray(detailRes.data?.items) ? detailRes.data.items : [];
+        const obsolete = items.filter((item) => item.type === 'flight' && item.id !== context.itemId);
+        await Promise.all(obsolete.map((item) => tripsApi.removeItem(targetTripId, item.id)));
+      };
+
+      replaceCurrentFlight()
+        .then(() => {
+          navigate(safeReturnTo);
+        })
+        .catch((err) => {
+          setState((prev) => ({
+            ...prev,
+            error: err.message || 'Se agrego el vuelo, pero no se pudo completar el reemplazo.',
+          }));
+        });
+      return;
+    }
+
     if (!flowEnabled) return;
 
     const destinationCity = cityFromCode(offer.destinationCity || offer.destination);
@@ -174,7 +255,7 @@ export default function SearchPage() {
     const checkOut = form.returnDate || addDays(form.departureDate || todayStr, 1);
 
     const next = new URLSearchParams();
-    next.set('tripId', flowTripId);
+    next.set('tripId', targetTripId);
     next.set('flow', 'create');
     next.set('city', destinationCity);
     next.set('travelers', String(totalTravelers));
@@ -345,7 +426,7 @@ export default function SearchPage() {
             disabled={state.busy}
             className="lg:col-span-4 self-start rounded-md bg-azul-600 px-4 py-2 text-sm font-medium text-white hover:bg-azul-700 active:bg-azul-800 disabled:opacity-50"
           >
-            {state.busy ? 'Buscando en el proveedor...' : `Buscar (${totalTravelers} pasajero${totalTravelers === 1 ? '' : 's'})`}
+            {state.busy ? 'Consultando vuelos' : `Buscar (${totalTravelers} pasajero${totalTravelers === 1 ? '' : 's'})`}
           </button>
         </form>
       </Hero>
@@ -354,6 +435,46 @@ export default function SearchPage() {
         <p className="rounded-md border border-azul-200 bg-azul-50 px-4 py-3 text-sm text-azul-800">
           Paso 1 de 3: elige un vuelo para este viaje. Al agregarlo te llevamos a hospedaje con el destino precargado.
         </p>
+      )}
+
+      {replaceFlightFlow && (
+        <p className="rounded-md border border-azul-200 bg-azul-50 px-4 py-3 text-sm text-azul-800">
+          Modo actualizacion: al agregar un nuevo vuelo reemplazaremos el vuelo actual y volveras al detalle del viaje.
+        </p>
+      )}
+
+      {isAuthenticated && trips.length > 0 && (
+        <div className="rounded-md border border-borde bg-superficie px-4 py-3">
+          <label htmlFor="flight-trip-select" className="block text-sm font-semibold text-tinta-700">
+            Dirigir reserva al viaje
+          </label>
+          <select
+            id="flight-trip-select"
+            value={tripId}
+            onChange={(event) => setTripId(event.target.value)}
+            disabled={replaceFlightFlow}
+            className="mt-1 h-10 w-full rounded-md border border-bordeInteractivo bg-superficie px-2 text-cuerpo text-tinta-900"
+          >
+            {trips.map((trip) => (
+              <option key={trip.id} value={trip.id}>
+                {trip.title} · {trip.destinationCity || 'Destino por definir'}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {isAuthenticated && trips.length === 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-ambar-100 bg-ambar-50 px-4 py-3">
+          <p className="text-sm text-ambar-700">Necesitas crear un viaje antes de agendar vuelos.</p>
+          <button
+            type="button"
+            onClick={() => navigate('/viajes')}
+            className="rounded-md border border-borde px-3 py-1.5 text-sm font-semibold text-tinta-700 hover:bg-superficie"
+          >
+            Ir a mis viajes
+          </button>
+        </div>
       )}
 
       {!state.searched && (
@@ -404,7 +525,7 @@ export default function SearchPage() {
               key={offer.externalId}
               offer={enrichedOffer}
               travelers={totalTravelers}
-              tripId={flowTripId}
+              tripId={tripId}
               onAdded={onFlightAdded}
             />
           );

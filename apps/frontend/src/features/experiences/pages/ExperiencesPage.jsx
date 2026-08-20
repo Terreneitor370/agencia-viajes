@@ -23,6 +23,8 @@ const normalizeTrip = (trip) => ({
   id: trip.id,
   title: trip.title,
   destinationCity: trip.destination_city ?? trip.destinationCity,
+  startDate: dateOnly(trip.start_date ?? trip.startDate),
+  endDate: dateOnly(trip.end_date ?? trip.endDate),
   isPaid: Boolean(trip.is_paid ?? trip.isPaid),
 });
 
@@ -45,6 +47,32 @@ const fitText = (value, max) => {
   return text.length <= max ? text : text.slice(0, max);
 };
 
+const dateOnly = (value) => (value ? String(value).slice(0, 10) : '');
+
+const dateAtMidnight = (isoDate) => {
+  if (!isoDate) return null;
+  return new Date(`${isoDate}T00:00:00`);
+};
+
+const isDateWithinRange = (isoDate, startDate, endDate) => {
+  const selected = dateAtMidnight(isoDate);
+  const start = dateAtMidnight(startDate);
+  const end = dateAtMidnight(endDate);
+  if (!selected || !start || !end) return false;
+  return selected >= start && selected <= end;
+};
+
+const dayIndexForDate = (isoDate, startDate, endDate) => {
+  const selected = dateAtMidnight(isoDate);
+  const start = dateAtMidnight(startDate);
+  const end = dateAtMidnight(endDate);
+  if (!selected || !start || !end) return 1;
+
+  const totalDays = Math.max(1, Math.round((end - start) / 86400000) + 1);
+  const raw = Math.round((selected - start) / 86400000) + 1;
+  return Math.max(1, Math.min(totalDays, raw));
+};
+
 export default function ExperiencesPage() {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -64,13 +92,20 @@ export default function ExperiencesPage() {
   const [searched, setSearched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [degraded, setDegraded] = useState(false);
 
   const [trips, setTrips] = useState([]);
   const [tripId, setTripId] = useState(flowTripId);
+  const [reservationDateByExperience, setReservationDateByExperience] = useState({});
   const [addingId, setAddingId] = useState('');
   const [addedByTrip, setAddedByTrip] = useState({});
   const autoSearchDone = useRef(false);
+
+  const selectedTrip = useMemo(
+    () => trips.find((trip) => trip.id === tripId) || null,
+    [trips, tripId],
+  );
+
+  const tripHasValidDateRange = Boolean(selectedTrip?.startDate && selectedTrip?.endDate);
 
   const autoSearchPayload = useMemo(() => {
     const cityFromQuery = searchParams.get('city');
@@ -131,13 +166,15 @@ export default function ExperiencesPage() {
       });
 
       setLocation(res.location || null);
-      setDegraded(Boolean(res.degraded));
       setResults(Array.isArray(res.data) ? res.data.map(normalizeExperience) : []);
     } catch (err) {
       setResults([]);
-      setError(err.message || 'No fue posible buscar experiencias.');
+      if (err.status === 404) {
+        setError('No se encontro la ciudad. Verifica el nombre e intenta de nuevo.');
+      } else {
+        setError(err.message || 'No fue posible buscar experiencias.');
+      }
       setLocation(null);
-      setDegraded(false);
     } finally {
       setBusy(false);
     }
@@ -169,7 +206,27 @@ export default function ExperiencesPage() {
     runSearch();
   };
 
-  const addToTrip = async (experience) => {
+  const reservationStateKey = (experienceId) => `${tripId}:${experienceId}`;
+
+  const reservationDateForExperience = (experienceId) => {
+    if (!tripHasValidDateRange) return '';
+    const key = reservationStateKey(experienceId);
+    const customDate = reservationDateByExperience[key] || '';
+    if (isDateWithinRange(customDate, selectedTrip.startDate, selectedTrip.endDate)) {
+      return customDate;
+    }
+    return selectedTrip.startDate;
+  };
+
+  const setReservationDateForExperience = (experienceId, dateValue) => {
+    const key = reservationStateKey(experienceId);
+    setReservationDateByExperience((prev) => ({
+      ...prev,
+      [key]: dateValue,
+    }));
+  };
+
+  const addToTrip = async (experience, reservationDateValue) => {
     if (!isAuthenticated) {
       navigate('/login', { state: { from: { pathname: '/experiencias' } } });
       return;
@@ -180,7 +237,22 @@ export default function ExperiencesPage() {
       return;
     }
 
-    const key = `${tripId}:${experience.id}`;
+    if (!tripHasValidDateRange) {
+      setError('El viaje seleccionado no tiene fechas validas para agendar experiencias.');
+      return;
+    }
+
+    if (!reservationDateValue) {
+      setError('Selecciona la fecha de reservacion para la experiencia.');
+      return;
+    }
+
+    if (!isDateWithinRange(reservationDateValue, selectedTrip.startDate, selectedTrip.endDate)) {
+      setError('La fecha de reservacion debe estar entre la llegada y el regreso del viaje.');
+      return;
+    }
+
+    const key = `${tripId}:${reservationDateValue}:${experience.id}`;
     if (addedByTrip[key]) return;
 
     setAddingId(experience.id);
@@ -204,6 +276,8 @@ export default function ExperiencesPage() {
         meta: {
           address: experience.address,
           categories: experience.categories,
+          reservationDate: reservationDateValue,
+          dayIndex: dayIndexForDate(reservationDateValue, selectedTrip.startDate, selectedTrip.endDate),
         },
       });
 
@@ -295,7 +369,7 @@ export default function ExperiencesPage() {
         {isAuthenticated && trips.length > 0 && (
           <div className="mt-4 rounded-md border border-borde bg-lienzo px-3 py-2">
             <label htmlFor="trip-select" className="block text-menor font-semibold text-tinta-700">
-              Agregar al viaje
+              Dirigir reserva al viaje
             </label>
             <select
               id="trip-select"
@@ -309,6 +383,12 @@ export default function ExperiencesPage() {
                 </option>
               ))}
             </select>
+
+            {selectedTrip?.startDate && selectedTrip?.endDate && (
+              <p className="mt-2 text-menor text-tinta-500">
+                Disponible del {selectedTrip.startDate} al {selectedTrip.endDate}. La fecha se selecciona en cada experiencia.
+              </p>
+            )}
           </div>
         )}
 
@@ -326,15 +406,13 @@ export default function ExperiencesPage() {
         </p>
       )}
 
-      {degraded && (
-        <p className="rounded-md border border-bordeFuerte border-dashed bg-lienzo px-3 py-2 text-menor text-tinta-700">
-          El proveedor no respondio en este momento. Intenta de nuevo en unos minutos.
-        </p>
-      )}
-
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {results.map((experience) => {
-          const key = `${tripId}:${experience.id}`;
+          const experienceReservationDate = reservationDateForExperience(experience.id);
+          const reservationDateReady = tripHasValidDateRange
+            && isDateWithinRange(experienceReservationDate, selectedTrip.startDate, selectedTrip.endDate);
+
+          const key = `${tripId}:${experienceReservationDate}:${experience.id}`;
           const added = Boolean(addedByTrip[key]);
           const loadingAdd = addingId === experience.id;
 
@@ -346,6 +424,9 @@ export default function ExperiencesPage() {
             actionVariant = 'secundario';
           } else if (trips.length === 0) {
             actionText = 'Crear viaje';
+            actionVariant = 'secundario';
+          } else if (!reservationDateReady) {
+            actionText = 'Selecciona fecha';
             actionVariant = 'secundario';
           } else if (added) {
             actionText = 'Agregada';
@@ -374,12 +455,26 @@ export default function ExperiencesPage() {
                   </div>
                 </div>
 
+                {isAuthenticated && trips.length > 0 && (
+                  <div className="mt-4">
+                    <Campo
+                      etiqueta="Fecha de reservacion"
+                      type="date"
+                      value={experienceReservationDate}
+                      min={selectedTrip?.startDate || undefined}
+                      max={selectedTrip?.endDate || undefined}
+                      onChange={(event) => setReservationDateForExperience(experience.id, event.target.value)}
+                      required
+                    />
+                  </div>
+                )}
+
                 <div className="mt-4">
                   <Boton
                     variante={actionVariant}
                     anchoCompleto
                     cargando={loadingAdd}
-                    disabled={added}
+                    disabled={added || (isAuthenticated && trips.length > 0 && !reservationDateReady)}
                     onClick={() => {
                       if (!isAuthenticated) {
                         navigate('/login', { state: { from: { pathname: '/experiencias' } } });
@@ -389,7 +484,7 @@ export default function ExperiencesPage() {
                         navigate('/viajes');
                         return;
                       }
-                      addToTrip(experience);
+                      addToTrip(experience, experienceReservationDate);
                     }}
                   >
                     {actionText}
