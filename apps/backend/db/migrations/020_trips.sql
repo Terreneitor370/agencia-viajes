@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS trip_items (
   trip_id          CHAR(36)     NOT NULL,
   type             ENUM('flight','stay','experience','other') NOT NULL,
   provider         VARCHAR(40)  NOT NULL,
-  external_id      VARCHAR(120) NULL,
+  external_id      VARCHAR(256) NULL,
   title            VARCHAR(160) NOT NULL,
   -- El dinero se guarda en centavos, como entero. Nunca FLOAT.
   unit_price_cents BIGINT       NOT NULL DEFAULT 0,

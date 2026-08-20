@@ -13,7 +13,7 @@ const FACILITY_LABELS = {
   gym: 'Gimnasio',
 };
 
-export default function StayCard({ stay, nights }) {
+export default function StayCard({ stay, nights, tripId = '', onAdded }) {
   const { image, loading: imageLoading } = useStayImage(stay);
 
   const formatPrice = (amount, currency) =>
@@ -115,7 +115,7 @@ export default function StayCard({ stay, nights }) {
         )}
 
         <div className="mt-2">
-          <AddToTripButton item={stay} type="stay" />
+          <AddToTripButton item={stay} type="stay" tripId={tripId} onAdded={onAdded} />
         </div>
       </div>
     </article>

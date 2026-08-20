@@ -1,6 +1,6 @@
 import StayCard from './StayCard';
 
-export default function StayResults({ stays, loading, metadata, searched, error }) {
+export default function StayResults({ stays, loading, metadata, searched, error, tripId = '', onStayAdded }) {
   if (loading) {
     return (
       <div className="space-y-3" aria-busy="true" aria-live="polite">
@@ -42,7 +42,13 @@ export default function StayResults({ stays, loading, metadata, searched, error 
 
       <div className="grid gap-3">
         {stays.map((stay, index) => (
-          <StayCard key={stay.externalId || index} stay={stay} nights={metadata.nights} />
+          <StayCard
+            key={stay.externalId || index}
+            stay={stay}
+            nights={metadata.nights}
+            tripId={tripId}
+            onAdded={onStayAdded}
+          />
         ))}
       </div>
     </section>

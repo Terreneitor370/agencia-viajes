@@ -9,8 +9,8 @@
  */
 let pendiente = null;
 
-export function guardarPendiente(item, type) {
-  pendiente = { item, type };
+export function guardarPendiente(item, type, tripId = '') {
+  pendiente = { item, type, tripId: tripId || '' };
 }
 
 export function leerPendiente() {
@@ -24,12 +24,22 @@ export function limpiarPendiente() {
 /** Campos que dependen del tipo de resultado (vuelo, hospedaje, o cualquier otro). */
 function camposPorTipo(item, type) {
   if (type === 'flight') {
+    const originCity = item.originCity || item.origin || '';
+    const destinationCity = item.destinationCity || item.destination || '';
     return {
       title: `${item.origin} → ${item.destination} (${item.airline})`,
       unitPriceCents: Math.round(item.price.amount * 100),
       currency: item.price.currency || 'MXN',
       pricingMode: item.pricingMode || 'per_person',
       estimated: item.price.estimated || false,
+      meta: {
+        originCode: item.origin || null,
+        destinationCode: item.destination || null,
+        originCity,
+        destinationCity,
+        departureAt: item.departureAt || null,
+        returnDepartureAt: item.return?.departureAt || null,
+      },
     };
   }
   if (type === 'stay') {
@@ -39,6 +49,13 @@ function camposPorTipo(item, type) {
       currency: item.price?.currency || 'MXN',
       pricingMode: item.pricingMode || 'per_night_per_room',
       estimated: item.price?.estimated || true,
+      meta: {
+        address: item.address || null,
+        city: item.city || null,
+        stars: item.stars || null,
+        phone: item.phone || null,
+        website: item.website || null,
+      },
     };
   }
   return {
@@ -47,16 +64,18 @@ function camposPorTipo(item, type) {
     currency: item.price?.currency || 'MXN',
     pricingMode: item.pricingMode || 'per_person',
     estimated: item.price?.estimated || true,
+    meta: item.meta || null,
   };
 }
 
 /** Construye el payload de POST /trips/:id/items para un item de busqueda. */
 export function construirPayload(item, type) {
+  const extras = camposPorTipo(item, type);
   return {
     type,
     provider: item.provider || 'unknown',
     externalId: item.externalId || null,
     quantity: 1,
-    ...camposPorTipo(item, type),
+    ...extras,
   };
 }

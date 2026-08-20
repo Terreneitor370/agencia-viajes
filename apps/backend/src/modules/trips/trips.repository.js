@@ -77,6 +77,17 @@ module.exports = {
     'UPDATE trips SET deleted_at = NOW() WHERE id = ? AND user_id = ?', [id, userId],
   ),
 
+  hasPaidOrder: async (tripId, userId) => {
+    const row = await db.queryOne(
+      `SELECT id
+         FROM orders
+        WHERE trip_id = ? AND user_id = ? AND status = 'paid'
+        LIMIT 1`,
+      [tripId, userId],
+    );
+    return Boolean(row?.id);
+  },
+
   listItems: (tripId, userId) => db.query(
     `SELECT ti.id, ti.trip_id, ti.type, ti.provider, ti.external_id, ti.title, ti.unit_price_cents, ti.currency,
             ti.pricing_mode, ti.quantity, ti.estimated, ti.meta

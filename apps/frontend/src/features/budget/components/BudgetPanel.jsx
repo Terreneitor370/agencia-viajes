@@ -4,9 +4,10 @@
  * El calculo lo hace SIEMPRE el backend: este componente solo renderiza lo que
  * llega de la API y envia cambios de viajeros.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Distintivo from '../../../components/ui/Distintivo';
 import { dinero } from '../../../core/utils/formato';
+import { paymentsApi } from '../../payments/api';
 
 const LABELS = {
   flight: 'Vuelos',
@@ -59,7 +60,9 @@ function Breakdown({ budget, currency }) {
   );
 }
 
-function TravelersControl({ travelers, onChange, busy }) {
+function TravelersControl({ travelers, onChange, busy, disabled = false }) {
+  const locked = busy || disabled;
+
   return (
     <div>
       <div className="flex items-center justify-between gap-3">
@@ -70,7 +73,7 @@ function TravelersControl({ travelers, onChange, busy }) {
             onClick={() => onChange(travelers - 1)}
             className="h-6 w-6 rounded border border-borde text-tinta-700 hover:bg-lienzo"
             aria-label="Disminuir viajeros"
-            disabled={busy}
+            disabled={locked}
           >
             -
           </button>
@@ -80,7 +83,7 @@ function TravelersControl({ travelers, onChange, busy }) {
             onClick={() => onChange(travelers + 1)}
             className="h-6 w-6 rounded border border-borde text-tinta-700 hover:bg-lienzo"
             aria-label="Aumentar viajeros"
-            disabled={busy}
+            disabled={locked}
           >
             +
           </button>
@@ -92,18 +95,30 @@ function TravelersControl({ travelers, onChange, busy }) {
         min={1}
         max={20}
         value={travelers}
-        disabled={busy}
+        disabled={locked}
         onChange={(event) => onChange(event.target.value)}
         className="mt-2 h-2 w-full cursor-pointer appearance-none rounded-full bg-lienzo accent-azul-600 disabled:cursor-not-allowed"
       />
 
       {busy && <p className="mt-1 text-menor text-tinta-500">Recalculando...</p>}
+      {!busy && disabled && <p className="mt-1 text-menor text-tinta-500">Bloqueado por pago confirmado.</p>}
     </div>
   );
 }
 
-function BudgetContent({ budget, travelers, onChangeTravelers, busy }) {
-  const currency = budget?.currency || 'MXN';
+function BudgetContent({
+  budget,
+  travelers,
+  onChangeTravelers,
+  busy,
+  tripId,
+  currency: currencyProp,
+  isReadOnly = false,
+}) {
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState('');
+  const [orderStatus, setOrderStatus] = useState(null);
+  const currency = currencyProp || budget?.currency || 'MXN';
   const limit = budget?.budgetLimit == null ? null : Number(budget.budgetLimit);
   const total = Number(budget?.total || 0);
   const hasLimit = Number.isFinite(limit) && limit > 0;
@@ -111,6 +126,34 @@ function BudgetContent({ budget, travelers, onChangeTravelers, busy }) {
   const progress = hasLimit ? Math.max(2, Math.min(100, pct)) : 0;
   const nearLimit = hasLimit && !budget?.overBudget && pct >= 90;
   const remaining = Number(budget?.remaining || 0);
+  const hasItems = budget && budget.total > 0;
+  const isPaid = isReadOnly || orderStatus === 'paid';
+
+  useEffect(() => {
+    if (!tripId) return;
+    let cancelled = false;
+    paymentsApi.listOrders({ trip_id: tripId })
+      .then((res) => {
+        if (cancelled) return;
+        const orders = res.data || [];
+        const paid = orders.find((o) => o.status === 'paid');
+        if (paid && !cancelled) setOrderStatus('paid');
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [tripId]);
+
+  const handlePay = async () => {
+    setPaying(true);
+    setPayError('');
+    try {
+      const res = await paymentsApi.createCheckout({ tripId, currency });
+      window.location.href = res.data.sessionUrl;
+    } catch (err) {
+      setPayError(err.message || 'No se pudo iniciar el pago.');
+      setPaying(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -122,7 +165,7 @@ function BudgetContent({ budget, travelers, onChangeTravelers, busy }) {
         <p className="text-menor text-tinta-500">{dinero(budget?.perPerson, currency)} por persona</p>
       </header>
 
-      <TravelersControl travelers={travelers} onChange={onChangeTravelers} busy={busy} />
+      <TravelersControl travelers={travelers} onChange={onChangeTravelers} busy={busy} disabled={isPaid} />
 
       <div className={busy ? 'opacity-60 transition-opacity duration-realce' : 'transition-opacity duration-realce'}>
         {!budget ? (
@@ -167,6 +210,31 @@ function BudgetContent({ budget, travelers, onChangeTravelers, busy }) {
                 ✓ Te quedan {dinero(Math.max(0, remaining), currency)} antes de alcanzar tu limite.
               </p>
             )}
+
+            {hasItems && !isPaid && (
+              <div className="pt-2 border-t border-borde space-y-2">
+                <button
+                  type="button"
+                  onClick={handlePay}
+                  disabled={paying || busy}
+                  className="w-full rounded-md bg-exito px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-700 active:bg-green-800 disabled:opacity-50"
+                >
+                  {paying ? 'Redirigiendo a Stripe...' : 'Reservar y pagar'}
+                </button>
+                {payError && (
+                  <p className="text-menor text-critico text-center">{payError}</p>
+                )}
+              </div>
+            )}
+
+            {hasItems && isPaid && (
+              <div className="pt-2 border-t border-borde">
+                <div className="rounded-md border border-exito/20 bg-exitoSuave px-4 py-3 text-center">
+                  <p className="text-sm font-semibold text-exito">&#10003; Pagado</p>
+                  <p className="text-xs text-tinta-500 mt-1">Tu reserva esta confirmada</p>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -174,7 +242,16 @@ function BudgetContent({ budget, travelers, onChangeTravelers, busy }) {
   );
 }
 
-export default function BudgetPanel({ budget, travelers = 1, onChangeTravelers, busy = false, className = '' }) {
+export default function BudgetPanel({
+  budget,
+  travelers = 1,
+  onChangeTravelers,
+  busy = false,
+  className = '',
+  tripId,
+  currency,
+  isReadOnly = false,
+}) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const safeTravelers = clampTravelers(travelers);
 
@@ -187,9 +264,9 @@ export default function BudgetPanel({ budget, travelers = 1, onChangeTravelers, 
     if (!budget) {
       return { total: 'Sin datos', status: null };
     }
-    const currency = budget.currency || 'MXN';
+    const cur = budget.currency || 'MXN';
     const status = budget.overBudget ? 'critico' : 'exito';
-    return { total: dinero(budget.total, currency), status };
+    return { total: dinero(budget.total, cur), status };
   }, [budget]);
 
   return (
@@ -200,6 +277,9 @@ export default function BudgetPanel({ budget, travelers = 1, onChangeTravelers, 
           travelers={safeTravelers}
           onChangeTravelers={changeTravelers}
           busy={busy}
+          tripId={tripId}
+          currency={currency}
+          isReadOnly={isReadOnly}
         />
       </aside>
 
@@ -234,6 +314,9 @@ export default function BudgetPanel({ budget, travelers = 1, onChangeTravelers, 
               travelers={safeTravelers}
               onChangeTravelers={changeTravelers}
               busy={busy}
+              tripId={tripId}
+              currency={currency}
+              isReadOnly={isReadOnly}
             />
           </div>
         )}

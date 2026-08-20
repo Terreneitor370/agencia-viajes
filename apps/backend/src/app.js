@@ -32,6 +32,19 @@ applySecurity(app);
 // 3. Limite de tasa global (antes de parsear el cuerpo: no gastamos CPU en floods).
 app.use(globalLimiter);
 
+// 3.5. Stripe webhook: necesita el body RAW para verificar la firma.
+//      Se procesa ANTES de express.json() para preservar el buffer.
+if (env.STRIPE_SECRET_KEY) {
+  const paymentsWebhook = require('./modules/payments/payments.controller').webhook;
+  app.post(`${API_PREFIX}/payments/webhook`, express.raw({ type: 'application/json', limit: '200kb' }),
+    async (req, res, next) => {
+      try {
+        await paymentsWebhook(req, res);
+      } catch (err) { next(err); }
+    },
+  );
+}
+
 // 4. Parseo del cuerpo con limite de tamano (defensa contra DoS por payload gigante).
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: false, limit: '100kb' }));

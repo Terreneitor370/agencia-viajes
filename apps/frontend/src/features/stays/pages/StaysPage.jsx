@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useStays } from '../hooks/useStays';
 import StaySearchForm from '../components/StaySearchForm';
 import StayResults from '../components/StayResults';
@@ -16,11 +17,76 @@ const DESTINOS = [
   { key: 'san-cris', city: 'San Cristóbal de las Casas', label: 'San Cristóbal de las Casas', hint: 'Pueblos mágicos' },
 ];
 
-export default function StaysPage() {
-  const { stays, loading, error, metadata, searched, search, changeCurrency } = useStays();
-  const [citySeed, setCitySeed] = useState('');
+const clamp = (value, min, max) => Math.min(max, Math.max(min, Number(value) || min));
 
-  const quickSearch = ({ city }) => setCitySeed(city);
+export default function StaysPage() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { stays, loading, error, metadata, searched, search, changeCurrency } = useStays();
+  const [seedOverrides, setSeedOverrides] = useState({});
+  const selectedCityRef = useRef('');
+
+  const flowTripId = searchParams.get('tripId') || '';
+  const flowEnabled = searchParams.get('flow') === 'create' && Boolean(flowTripId);
+
+  const queryDefaults = useMemo(() => ({
+    city: searchParams.get('city') || '',
+    checkIn: searchParams.get('checkIn') || '',
+    checkOut: searchParams.get('checkOut') || '',
+    travelers: clamp(searchParams.get('travelers') || 1, 1, 20),
+    currency: searchParams.get('currency') || 'MXN',
+    radiusKm: 8,
+    limit: 20,
+  }), [searchParams]);
+
+  const formDefaults = useMemo(() => ({
+    ...queryDefaults,
+    ...seedOverrides,
+  }), [queryDefaults, seedOverrides]);
+
+  const autoSearchDone = useRef(false);
+
+  const handleSearch = useCallback(async (params) => {
+    selectedCityRef.current = params.city || '';
+    return search(params);
+  }, [search]);
+
+  useEffect(() => {
+    if (autoSearchDone.current) return;
+    if (!queryDefaults.city || !queryDefaults.checkIn || !queryDefaults.checkOut) return;
+
+    autoSearchDone.current = true;
+    handleSearch({
+      city: queryDefaults.city,
+      checkIn: queryDefaults.checkIn,
+      checkOut: queryDefaults.checkOut,
+      travelers: queryDefaults.travelers,
+      radiusKm: queryDefaults.radiusKm,
+      limit: queryDefaults.limit,
+      currency: queryDefaults.currency,
+    });
+  }, [queryDefaults, handleSearch]);
+
+  const formKey = [
+    formDefaults.city,
+    formDefaults.checkIn,
+    formDefaults.checkOut,
+    formDefaults.travelers,
+    formDefaults.currency,
+  ].join('|');
+
+  const quickSearch = ({ city }) => setSeedOverrides((prev) => ({ ...prev, city }));
+
+  const onStayAdded = () => {
+    if (!flowEnabled) return;
+    const city = selectedCityRef.current || formDefaults.city || queryDefaults.city;
+    const next = new URLSearchParams({
+      tripId: flowTripId,
+      flow: 'create',
+      city,
+    });
+    navigate(`/experiencias?${next.toString()}`);
+  };
 
   return (
     <div className="min-h-screen bg-lienzo space-y-6 p-4">
@@ -31,13 +97,19 @@ export default function StaysPage() {
         subtitle="Hoteles, apartamentos y hostales con precio estimado por noche."
       >
         <StaySearchForm
-          key={citySeed}
-          defaultCity={citySeed}
-          onSearch={search}
+          key={formKey}
+          defaultValues={formDefaults}
+          onSearch={handleSearch}
           onCurrencyChange={changeCurrency}
           loading={loading}
         />
       </Hero>
+
+      {flowEnabled && (
+        <p className="rounded-md border border-azul-200 bg-azul-50 px-4 py-3 text-sm text-azul-800">
+          Paso 2 de 3: elige hospedaje. Al agregarlo te llevamos a experiencias en el mismo destino.
+        </p>
+      )}
 
       {!searched && (
         <PopularOptions
@@ -61,7 +133,15 @@ export default function StaysPage() {
         </p>
       )}
 
-      <StayResults stays={stays} loading={loading} metadata={metadata} searched={searched} error={error} />
+      <StayResults
+        stays={stays}
+        loading={loading}
+        metadata={metadata}
+        searched={searched}
+        error={error}
+        tripId={flowTripId}
+        onStayAdded={onStayAdded}
+      />
     </div>
   );
 }

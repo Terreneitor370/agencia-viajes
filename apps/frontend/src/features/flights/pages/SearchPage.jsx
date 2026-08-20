@@ -1,7 +1,8 @@
 /**
  * Buscador de vuelos. DUENO: Kassie (modulo B).
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { flightsApi } from '../api';
 import { getRate, convertList } from '../../../core/api/rates';
 import FlightCard from '../components/FlightCard';
@@ -18,7 +19,28 @@ const maxDateStr = maxDate.toISOString().split('T')[0];
 
 const MAX_PAX = 9;
 
-const initialForm = { tripType: 'round_trip', origin: '', destination: '', departureDate: '', returnDate: '', adults: 1, children: 0, infants: 0, cabinClass: 'economy', currency: 'MXN', baggageFilter: 'cualquiera' };
+const clamp = (value, min, max) => Math.min(max, Math.max(min, Number(value) || min));
+
+const addDays = (iso, days) => {
+  if (!iso) return '';
+  const date = new Date(`${iso}T00:00:00`);
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+};
+
+const initialForm = (seed = {}) => ({
+  tripType: 'round_trip',
+  origin: seed.origin || '',
+  destination: seed.destination || '',
+  departureDate: seed.departureDate || '',
+  returnDate: seed.returnDate || '',
+  adults: clamp(seed.travelers || 1, 1, MAX_PAX),
+  children: 0,
+  infants: 0,
+  cabinClass: 'economy',
+  currency: seed.currency || 'MXN',
+  baggageFilter: 'cualquiera',
+});
 
 const RUTAS = [
   { key: 'mex-cun', origin: 'MEX', destination: 'CUN', label: 'Ciudad de México → Cancún', hint: 'La playa más buscada' },
@@ -30,7 +52,21 @@ const RUTAS = [
 ];
 
 export default function SearchPage() {
-  const [form, setForm] = useState(initialForm);
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const flowTripId = searchParams.get('tripId') || '';
+  const flowEnabled = searchParams.get('flow') === 'create' && Boolean(flowTripId);
+  const seed = useMemo(() => ({
+    origin: searchParams.get('origin') || '',
+    destination: searchParams.get('destination') || '',
+    departureDate: searchParams.get('departureDate') || '',
+    returnDate: searchParams.get('returnDate') || '',
+    travelers: searchParams.get('travelers') || 1,
+    currency: searchParams.get('currency') || 'MXN',
+  }), [searchParams]);
+
+  const [form, setForm] = useState(() => initialForm(seed));
   const [offers, setOffers] = useState([]);
   const [airports, setAirports] = useState([]);
   const [state, setState] = useState({ busy: false, error: '', degraded: false, searched: false });
@@ -42,6 +78,18 @@ export default function SearchPage() {
       .catch(() => { if (mounted) setAirports([]); });
     return () => { mounted = false; };
   }, []);
+
+  const cityByIata = useMemo(() => Object.fromEntries(
+    airports
+      .filter((airport) => airport?.iata && airport?.value)
+      .map((airport) => [String(airport.iata).toUpperCase(), airport.value]),
+  ), [airports]);
+
+  const cityFromCode = (value) => {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    return cityByIata[raw.toUpperCase()] || raw;
+  };
 
   const totalTravelers = form.adults + form.children + form.infants;
 
@@ -96,6 +144,10 @@ export default function SearchPage() {
   const onSubmit = (event) => {
     event.preventDefault();
     if (totalTravelers < 1 || totalTravelers > 9) return;
+    if (form.tripType === 'round_trip' && form.returnDate && form.departureDate && form.returnDate <= form.departureDate) {
+      setState((s) => ({ ...s, error: 'La fecha de regreso debe ser posterior a la de salida.' }));
+      return;
+    }
     doSearch({
       tripType: form.tripType,
       origin: form.origin,
@@ -112,6 +164,25 @@ export default function SearchPage() {
 
   const quickSearch = ({ origin, destination }) => {
     setForm((f) => ({ ...f, origin, destination }));
+  };
+
+  const onFlightAdded = (offer) => {
+    if (!flowEnabled) return;
+
+    const destinationCity = cityFromCode(offer.destinationCity || offer.destination);
+    const checkIn = form.departureDate;
+    const checkOut = form.returnDate || addDays(form.departureDate || todayStr, 1);
+
+    const next = new URLSearchParams();
+    next.set('tripId', flowTripId);
+    next.set('flow', 'create');
+    next.set('city', destinationCity);
+    next.set('travelers', String(totalTravelers));
+    next.set('currency', form.currency);
+    if (checkIn) next.set('checkIn', checkIn);
+    if (checkOut) next.set('checkOut', checkOut);
+
+    navigate(`/hospedaje?${next.toString()}`);
   };
 
   const visibleOffers = offers.filter((offer) => {
@@ -190,7 +261,7 @@ export default function SearchPage() {
                 type="date"
                 value={form.returnDate}
                 onChange={update('returnDate')}
-                min={form.departureDate || todayStr}
+                min={form.departureDate ? new Date(new Date(form.departureDate).getTime() + 86400000).toISOString().split('T')[0] : todayStr}
                 max={maxDateStr}
                 required
                 className={inputCls}
@@ -279,6 +350,12 @@ export default function SearchPage() {
         </form>
       </Hero>
 
+      {flowEnabled && (
+        <p className="rounded-md border border-azul-200 bg-azul-50 px-4 py-3 text-sm text-azul-800">
+          Paso 1 de 3: elige un vuelo para este viaje. Al agregarlo te llevamos a hospedaje con el destino precargado.
+        </p>
+      )}
+
       {!state.searched && (
         <PopularOptions
           eyebrow="Descubrimiento · Vuelos"
@@ -312,9 +389,26 @@ export default function SearchPage() {
             ))}
           </div>
         )}
-        {!state.busy && visibleOffers.map((offer) => (
-          <FlightCard key={offer.externalId} offer={offer} travelers={totalTravelers} />
-        ))}
+        {!state.busy && visibleOffers.map((offer) => {
+          const enrichedOffer = {
+            ...offer,
+            originCity: cityFromCode(offer.originCity || offer.origin),
+            destinationCity: cityFromCode(offer.destinationCity || offer.destination),
+            selectedTravelers: totalTravelers,
+            selectedStartDate: form.departureDate,
+            selectedEndDate: form.returnDate,
+          };
+
+          return (
+            <FlightCard
+              key={offer.externalId}
+              offer={enrichedOffer}
+              travelers={totalTravelers}
+              tripId={flowTripId}
+              onAdded={onFlightAdded}
+            />
+          );
+        })}
         {state.searched && !state.busy && offers.length === 0 && !state.error && (
           <p className="text-sm text-tinta-500">No se encontraron vuelos para esos criterios.</p>
         )}

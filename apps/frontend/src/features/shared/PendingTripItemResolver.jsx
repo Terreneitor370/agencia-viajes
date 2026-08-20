@@ -5,6 +5,33 @@ import { construirPayload, leerPendiente, limpiarPendiente } from './pendingTrip
 
 const NOMBRE_TIPO = { flight: 'vuelo', stay: 'hospedaje' };
 
+const toDate = (value) => (value ? String(value).slice(0, 10) : '');
+
+function tripPatchFromFlight(item) {
+  const patch = {};
+  const originCity = String(item.originCity || item.origin || '').trim();
+  const destinationCity = String(item.destinationCity || item.destination || '').trim();
+
+  if (originCity && destinationCity && originCity !== destinationCity) {
+    patch.originCity = originCity;
+    patch.destinationCity = destinationCity;
+  }
+
+  const travelers = Number(item.selectedTravelers);
+  if (Number.isFinite(travelers) && travelers >= 1 && travelers <= 20) {
+    patch.travelers = travelers;
+  }
+
+  const startDate = toDate(item.selectedStartDate);
+  const endDate = toDate(item.selectedEndDate);
+  if (startDate && endDate && new Date(`${endDate}T00:00:00`) > new Date(`${startDate}T00:00:00`)) {
+    patch.startDate = startDate;
+    patch.endDate = endDate;
+  }
+
+  return patch;
+}
+
 /**
  * Sin UI propia salvo un aviso temporal. Se monta una sola vez en AppLayout.
  *
@@ -29,12 +56,31 @@ export default function PendingTripItemResolver() {
       try {
         const tripsRes = await api.get('/trips');
         const trips = tripsRes.data || [];
-        if (trips.length === 0) {
-          setAviso({ tipo: 'error', texto: 'Inicia sesion pero primero crea un viaje desde "Mis viajes" para poder guardar ahi.' });
+        const editableTrips = trips.filter((trip) => !(trip.is_paid ?? trip.isPaid));
+        if (editableTrips.length === 0) {
+          setAviso({ tipo: 'error', texto: 'No tienes viajes editables. Los viajes pagados no aceptan cambios.' });
           return;
         }
+
+        const allowedIds = new Set(editableTrips.map((trip) => trip.id));
+        const targetTripId = pendiente.tripId && allowedIds.has(pendiente.tripId)
+          ? pendiente.tripId
+          : editableTrips[0].id;
+
         const payload = construirPayload(pendiente.item, pendiente.type);
-        await api.post(`/trips/${trips[0].id}/items`, payload);
+        await api.post(`/trips/${targetTripId}/items`, payload);
+
+        if (pendiente.type === 'flight') {
+          const patch = tripPatchFromFlight(pendiente.item);
+          if (Object.keys(patch).length > 0) {
+            try {
+              await api.patch(`/trips/${targetTripId}`, patch);
+            } catch {
+              // El pendiente principal ya se guardo; solo se omite la sincronizacion.
+            }
+          }
+        }
+
         const nombre = NOMBRE_TIPO[pendiente.type] || 'elemento';
         setAviso({ tipo: 'exito', texto: `Se agrego el ${nombre} que buscabas a tu viaje.` });
       } catch {
