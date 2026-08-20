@@ -129,6 +129,25 @@ exports.googleStart = async (req, res) => {
 const oauthCookiePath = { path: '/api/v1/auth' };
 const loginWithError = (res, motivo) => res.redirect(`${env.FRONTEND_URL}/login?oauth_error=${motivo}`);
 
+function oauthFailureReason(err) {
+  const message = String(err?.message || '').toLowerCase();
+
+  if (err?.status === 409) return 'correo_registrado';
+  if (message.includes('no esta verificado')) return 'correo_no_verificado';
+
+  // verifyIdToken: audience/clientId invalido o token para otro cliente OAuth.
+  if (message.includes('wrong recipient') || message.includes('audience')) {
+    return 'cliente_oauth_invalido';
+  }
+
+  // El intercambio de code por token o llamadas de Google fallaron.
+  if (err?.code === 'UPSTREAM_ERROR' || err?.status === 502) {
+    return 'proveedor_google';
+  }
+
+  return 'fallo';
+}
+
 exports.googleCallback = async (req, res) => {
   const clearOAuthCookies = () => {
     res.clearCookie('oauth_state', oauthCookiePath);
@@ -164,11 +183,12 @@ exports.googleCallback = async (req, res) => {
     setSessionCookies(res, session);
     return res.redirect(env.FRONTEND_URL);
   } catch (err) {
-    logger.security('OAUTH_GOOGLE_FAILED', { message: err.message });
-    // El unico caso de googleExchange() con un mensaje seguro de mostrar tal
-    // cual: el correo ya tiene cuenta con contrasena. El resto (token invalido,
-    // id_token no verificable, etc.) se queda generico a proposito.
-    if (err.status === 409) return loginWithError(res, 'correo_registrado');
-    return loginWithError(res, 'fallo');
+    logger.security('OAUTH_GOOGLE_FAILED', {
+      status: err?.status,
+      code: err?.code,
+      name: err?.name,
+      message: err?.message,
+    });
+    return loginWithError(res, oauthFailureReason(err));
   }
 };

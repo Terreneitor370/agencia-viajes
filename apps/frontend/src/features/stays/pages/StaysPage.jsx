@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../../../core/auth/useAuth';
+import { tripsApi } from '../../trips/api';
 import { useStays } from '../hooks/useStays';
 import StaySearchForm from '../components/StaySearchForm';
 import StayResults from '../components/StayResults';
@@ -19,15 +21,67 @@ const DESTINOS = [
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, Number(value) || min));
 
+const normalizeTrip = (trip) => ({
+  id: trip.id,
+  title: trip.title,
+  destinationCity: trip.destination_city ?? trip.destinationCity,
+  isPaid: Boolean(trip.is_paid ?? trip.isPaid),
+});
+
 export default function StaysPage() {
+  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { stays, loading, error, metadata, searched, search, changeCurrency } = useStays();
   const [seedOverrides, setSeedOverrides] = useState({});
+  const [trips, setTrips] = useState([]);
+  const [tripId, setTripId] = useState('');
+  const [actionError, setActionError] = useState('');
   const selectedCityRef = useRef('');
 
   const flowTripId = searchParams.get('tripId') || '';
-  const flowEnabled = searchParams.get('flow') === 'create' && Boolean(flowTripId);
+  const flowMode = searchParams.get('flow') || '';
+  const replaceTarget = searchParams.get('replace') || '';
+  const returnToParam = searchParams.get('returnTo') || '';
+  const flowEnabled = flowMode === 'create' && Boolean(flowTripId);
+  const replaceStayFlow = flowMode === 'replace' && replaceTarget === 'stay' && Boolean(flowTripId);
+  const safeReturnTo = returnToParam.startsWith('/')
+    ? returnToParam
+    : (flowTripId ? `/viajes/${flowTripId}` : '/viajes');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadTrips = async () => {
+      if (!isAuthenticated) {
+        setTrips([]);
+        setTripId(flowTripId || '');
+        return;
+      }
+
+      try {
+        const res = await tripsApi.list({ page: 1, pageSize: 50 });
+        if (cancelled) return;
+        const rows = Array.isArray(res.data) ? res.data.map(normalizeTrip) : [];
+        const editableRows = rows.filter((row) => !row.isPaid);
+        setTrips(editableRows);
+        setTripId((prev) => {
+          if (flowTripId && editableRows.some((row) => row.id === flowTripId)) return flowTripId;
+          if (prev && editableRows.some((row) => row.id === prev)) return prev;
+          return editableRows[0]?.id || '';
+        });
+      } catch {
+        if (cancelled) return;
+        setTrips([]);
+        setTripId(flowTripId || '');
+      }
+    };
+
+    loadTrips();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, flowTripId]);
 
   const queryDefaults = useMemo(() => ({
     city: searchParams.get('city') || '',
@@ -77,11 +131,39 @@ export default function StaysPage() {
 
   const quickSearch = ({ city }) => setSeedOverrides((prev) => ({ ...prev, city }));
 
-  const onStayAdded = () => {
+  const onStayAdded = (_stay, context = {}) => {
+    setActionError('');
+
+    const targetTripId = context.tripId || tripId || flowTripId;
+    if (!targetTripId) return;
+
+    if (replaceStayFlow) {
+      const replaceCurrentStay = async () => {
+        if (!context.itemId) {
+          throw new Error('No se pudo confirmar el nuevo hospedaje. Intenta de nuevo.');
+        }
+
+        const detailRes = await tripsApi.detail(targetTripId);
+        const items = Array.isArray(detailRes.data?.items) ? detailRes.data.items : [];
+        const obsolete = items.filter((item) => item.type === 'stay' && item.id !== context.itemId);
+        await Promise.all(obsolete.map((item) => tripsApi.removeItem(targetTripId, item.id)));
+      };
+
+      replaceCurrentStay()
+        .then(() => {
+          navigate(safeReturnTo);
+        })
+        .catch((err) => {
+          setActionError(err.message || 'Se agrego el hospedaje, pero no se pudo completar el reemplazo.');
+        });
+      return;
+    }
+
     if (!flowEnabled) return;
+
     const city = selectedCityRef.current || formDefaults.city || queryDefaults.city;
     const next = new URLSearchParams({
-      tripId: flowTripId,
+      tripId: targetTripId,
       flow: 'create',
       city,
     });
@@ -111,6 +193,46 @@ export default function StaysPage() {
         </p>
       )}
 
+      {replaceStayFlow && (
+        <p className="rounded-md border border-azul-200 bg-azul-50 px-4 py-3 text-sm text-azul-800">
+          Modo actualizacion: al agregar un nuevo hospedaje reemplazaremos el actual y volveras al detalle del viaje.
+        </p>
+      )}
+
+      {isAuthenticated && trips.length > 0 && (
+        <div className="rounded-md border border-borde bg-superficie px-4 py-3">
+          <label htmlFor="stay-trip-select" className="block text-sm font-semibold text-tinta-700">
+            Dirigir reserva al viaje
+          </label>
+          <select
+            id="stay-trip-select"
+            value={tripId}
+            onChange={(event) => setTripId(event.target.value)}
+            disabled={replaceStayFlow}
+            className="mt-1 h-10 w-full rounded-md border border-bordeInteractivo bg-superficie px-2 text-cuerpo text-tinta-900"
+          >
+            {trips.map((trip) => (
+              <option key={trip.id} value={trip.id}>
+                {trip.title} · {trip.destinationCity || 'Destino por definir'}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {isAuthenticated && trips.length === 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-ambar-100 bg-ambar-50 px-4 py-3">
+          <p className="text-sm text-ambar-700">Necesitas crear un viaje antes de agendar hospedajes.</p>
+          <button
+            type="button"
+            onClick={() => navigate('/viajes')}
+            className="rounded-md border border-borde px-3 py-1.5 text-sm font-semibold text-tinta-700 hover:bg-superficie"
+          >
+            Ir a mis viajes
+          </button>
+        </div>
+      )}
+
       {!searched && (
         <PopularOptions
           eyebrow="Descubrimiento · Hospedaje"
@@ -127,6 +249,12 @@ export default function StaysPage() {
         </p>
       )}
 
+      {actionError && (
+        <p role="alert" className="rounded-md bg-criticoSuave px-4 py-3 text-sm text-critico">
+          {actionError}
+        </p>
+      )}
+
       {metadata.degraded && (
         <p className="rounded-md bg-ambar-50 px-4 py-3 text-sm text-ambar-700 border border-dashed border-ambar-400">
           El proveedor de hospedaje no respondió. Estás viendo resultados de ejemplo.
@@ -139,7 +267,7 @@ export default function StaysPage() {
         metadata={metadata}
         searched={searched}
         error={error}
-        tripId={flowTripId}
+        tripId={tripId}
         onStayAdded={onStayAdded}
       />
     </div>
