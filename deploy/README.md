@@ -1,8 +1,18 @@
 # Despliegue en el VPS escolar
 
 Backend en Docker, frontend como build estatico servido por Nginx. Puerto
-asignado: **3005** (interno del contenedor: 3000). Subdominio:
-**agencia-viajes.idgs8-2.tech**.
+asignado: **3005**. Subdominio: **agencia-viajes.idgs8-2.tech**.
+
+El contenedor del backend corre con `network_mode: host` (no bridge): el
+MySQL de este VPS solo acepta conexiones por `127.0.0.1`
+(`bind-address=127.0.0.1`), y un contenedor en la red bridge por defecto de
+Docker le llega desde la IP del gateway, no desde loopback -- eso da
+`ETIMEDOUT` en vez de conectar. Con host networking el contenedor comparte
+la red del VPS directo, sin ese problema. La contraparte es que el
+contenedor ya NO tiene un mapeo de puertos propio: el backend expone su
+puerto (3005, via `PORT` en `.env.production`) directo en el VPS, como si
+corriera con PM2. `server.js` lo ata solo a `127.0.0.1` en produccion para
+no exponerlo en todas las interfaces del servidor compartido.
 
 ## 1. Primera vez: clonar y configurar
 
@@ -53,13 +63,9 @@ EXIT;
 
 En `apps/backend/.env.production` llena `DB_USER`/`DB_PASSWORD` con ese
 usuario/contraseña, `DB_PORT` con el puerto que confirmaste arriba, y
-agrega tambien `DB_HOST=localhost` (o `127.0.0.1`).
-
-Ojo, esto es distinto de lo que corre DENTRO del contenedor: ahi
-`docker-compose.yml` sobreescribe `DB_HOST` a `host.docker.internal`
-automaticamente (ver paso 4), así que ese valor de `DB_HOST=localhost` en
-el archivo solo aplica al paso de migraciones de abajo, que corre
-directo con Node en el propio VPS, no en Docker.
+`DB_HOST=localhost` (o `127.0.0.1`). Como el contenedor corre con
+`network_mode: host` (ver paso 4), este mismo valor aplica igual dentro y
+fuera de Docker -- no hay que cambiarlo entre uno y otro.
 
 Aplica las migraciones (fuera de Docker, directo con Node -- estos scripts
 leen `apps/backend/.env`, no `.env.production` directamente, por eso se
@@ -91,14 +97,34 @@ Esto genera `apps/frontend/dist/`, que es lo que Nginx sirve directo (ver
 
 ## 4. Levantar el backend con Docker
 
+Confirma que `apps/backend/.env.production` tenga `PORT=3005` (tu puerto
+asignado) -- con `network_mode: host` no hay traduccion de puertos de
+Docker, ese valor es el puerto real en el VPS.
+
 ```bash
-docker compose up -d --build
-docker ps
-docker logs -f agencia_viajes_backend
+sudo docker compose up -d --build
+sudo docker ps
+sudo docker logs agencia_viajes_backend
 ```
 
-Confirma en los logs que arranco sin errores de configuracion (env.js corta
-el arranque si falta una variable critica) y que conecto a MySQL.
+(si no quieres usar `sudo` cada vez: `sudo usermod -aG docker $USER` y
+vuelve a iniciar sesion SSH)
+
+Los logs deben mostrar los 9 modulos montados y "Backend escuchando..." sin
+errores. Eso NO prueba por si solo que conecto bien a MySQL -- confirmalo
+con una peticion real que toque la base de datos:
+
+```bash
+curl -i -X POST http://127.0.0.1:3005/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Prueba","email":"prueba-despliegue@test.local","password":"PruebaDespliegue1234!"}'
+```
+
+`201 Created` = conecto bien. Borra la cuenta de prueba despues:
+
+```bash
+sudo mysql -e "DELETE FROM agencia_viajes.users WHERE email='prueba-despliegue@test.local';"
+```
 
 ## 5. Nginx + SSL
 
@@ -133,6 +159,6 @@ cd /var/www/Terreneitor370/agencia-viajes
 git pull
 npm run db:migrate -w apps/backend   # solo si hay migraciones nuevas
 npm run build -w apps/frontend       # solo si cambio el frontend
-docker compose up -d --build         # solo si cambio el backend
+sudo docker compose up -d --build    # solo si cambio el backend
 sudo systemctl reload nginx          # solo si cambio deploy/nginx.agencia-viajes.conf
 ```

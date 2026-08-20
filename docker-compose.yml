@@ -2,11 +2,22 @@
 # es un build estatico (apps/frontend/dist) que Nginx sirve directamente,
 # igual que cualquier SPA -- no necesita su propio proceso/contenedor.
 #
-# MySQL vive en el HOST del VPS (127.0.0.1:3306), fuera de Docker. Un
-# contenedor en la red bridge por defecto no puede alcanzar el 127.0.0.1 del
-# host (son namespaces de red distintos), por eso host.docker.internal +
-# extra_hosts: sin esto, DB_HOST=host.docker.internal no resuelve en Linux
-# (a diferencia de Docker Desktop en Mac/Windows, donde ya viene resuelto).
+# network_mode: host (no bridge). Se probo primero con la red bridge por
+# defecto + host.docker.internal, pero el MySQL de este VPS tiene
+# bind-address=127.0.0.1 (ver /etc/mysql/mysql.conf.d/mysqld.cnf): solo
+# acepta conexiones que le lleguen literalmente por loopback, y un
+# contenedor en bridge le llega desde la IP del gateway de Docker, no desde
+# 127.0.0.1 -> ETIMEDOUT. Con host networking el contenedor comparte el
+# namespace de red del VPS directo, asi que 127.0.0.1 adentro es el mismo
+# 127.0.0.1 de MySQL. No se toco la config de MySQL (es compartida con el
+# resto del grupo).
+#
+# OJO: con host networking el mapeo "ports:" de Docker no aplica -- el
+# backend expone su puerto DIRECTO en el VPS, tal cual como si corriera con
+# PM2. Por eso apps/backend/.env.production DEBE traer PORT=3005 (tu puerto
+# asignado) y por eso server.js ata ese puerto solo a 127.0.0.1 en
+# produccion: sin esos dos, quedaria expuesto en todas las interfaces del
+# servidor compartido.
 services:
   backend:
     build:
@@ -14,14 +25,6 @@ services:
       dockerfile: apps/backend/Dockerfile
     container_name: agencia_viajes_backend
     restart: always
+    network_mode: host
     env_file:
       - apps/backend/.env.production
-    environment:
-      - DB_HOST=host.docker.internal
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    ports:
-      # Regla de oro del VPS compartido: SIEMPRE 127.0.0.1 en el lado del
-      # host. Nginx (que si corre en el host) es el unico que debe llegar a
-      # este puerto; nunca debe quedar expuesto en todas las interfaces.
-      - "127.0.0.1:3005:3000"

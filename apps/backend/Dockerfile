@@ -25,5 +25,7 @@ COPY apps/backend/scripts apps/backend/scripts
 COPY apps/backend/db apps/backend/db
 
 WORKDIR /app/apps/backend
-EXPOSE 3000
+# Sin EXPOSE: el contenedor corre con network_mode: host (ver
+# docker-compose.yml), donde EXPOSE no tiene efecto -- el puerto real lo
+# decide PORT en apps/backend/.env.production.
 CMD ["node", "src/server.js"]

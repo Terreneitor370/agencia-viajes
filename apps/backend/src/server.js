@@ -6,7 +6,13 @@ const env = require('./config/env');
 const logger = require('./core/logger');
 const db = require('./core/db');
 
-const server = app.listen(env.PORT, () => {
+// En produccion el contenedor corre con network_mode: host (el MySQL del VPS
+// solo acepta conexiones por 127.0.0.1, ver docker-compose.yml), asi que sin
+// este bind explicito el puerto quedaria expuesto en TODAS las interfaces del
+// servidor compartido en vez de solo loopback. En dev se deja sin restringir
+// (undefined = todas las interfaces) para no romper pruebas desde otro
+// dispositivo en la misma red.
+const server = app.listen(env.PORT, env.isProd ? '127.0.0.1' : undefined, () => {
   logger.info(`Backend escuchando en http://localhost:${env.PORT} [${env.NODE_ENV}]`);
   logger.info(`Politica de seguridad en runtime: SECURITY_ENFORCE=${env.SECURITY_ENFORCE}`);
 });
