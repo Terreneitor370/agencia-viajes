@@ -180,8 +180,11 @@ si no, Google rechaza el login con ese dominio.
 ```bash
 cd ~/agencia-viajes
 git pull
+npm ci                               # por si alguien agrego una dependencia nueva
 npm run db:migrate -w apps/backend   # solo si hay migraciones nuevas
 npm run build -w apps/frontend       # solo si cambio el frontend
-sudo docker compose up -d --build    # solo si cambio el backend
+sudo docker compose up -d --build    # solo si cambio el backend (el npm ci del backend corre DENTRO del build de Docker, no depende de este)
 sudo systemctl reload nginx          # solo si cambio deploy/nginx.agencia-viajes.conf
 ```
+
+`npm ci` en la raiz es rapido si nada cambio (solo valida el lockfile), y evita el error de "Cannot find module" si alguien agrego un paquete y se les olvido avisar.
