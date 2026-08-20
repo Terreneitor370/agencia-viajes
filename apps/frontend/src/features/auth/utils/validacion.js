@@ -6,7 +6,5 @@
  * no queremos que se vea invalido, eso lo cubre `required` aparte.
  */
 export const PATRON_NOMBRE = /^[\p{L}\s'-]*$/u;
-export const PATRON_CIUDAD = /^[\p{L}\s'.-]*$/u;
 
 export const esNombreValido = (valor) => PATRON_NOMBRE.test(valor);
-export const esCiudadValida = (valor) => PATRON_CIUDAD.test(valor);

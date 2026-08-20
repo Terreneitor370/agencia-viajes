@@ -10,9 +10,8 @@ import { ApiError } from '../../../core/api/client';
 import { useAuth } from '../../../core/auth/useAuth';
 import { authApi, usersApi } from '../api';
 import { LONGITUD_MINIMA_CONTRASENA, evaluarContrasena } from '../utils/contrasena';
-import { esCiudadValida, esNombreValido } from '../utils/validacion';
+import { esNombreValido } from '../utils/validacion';
 
-const MONEDAS = ['MXN', 'USD', 'EUR'];
 const ROLES_LEGIBLES = { admin: 'Administrador', traveler: 'Viajero' };
 
 export default function ProfilePage() {
@@ -21,13 +20,12 @@ export default function ProfilePage() {
 
   const [cargando, setCargando] = useState(true);
   const [perfil, setPerfil] = useState(null);
-  const [form, setForm] = useState({ name: '', homeCity: '', preferredCurrency: 'MXN' });
+  const [form, setForm] = useState({ name: '' });
   const [guardando, setGuardando] = useState(false);
   const [mensajePerfil, setMensajePerfil] = useState('');
   const [errorPerfil, setErrorPerfil] = useState('');
   const [erroresCampo, setErroresCampo] = useState({});
   const nombreValido = esNombreValido(form.name);
-  const ciudadValida = esCiudadValida(form.homeCity);
 
   useEffect(() => {
     let cancelado = false;
@@ -35,11 +33,7 @@ export default function ProfilePage() {
       .then(({ data }) => {
         if (cancelado) return;
         setPerfil(data);
-        setForm({
-          name: data.name || '',
-          homeCity: data.home_city || '',
-          preferredCurrency: data.preferred_currency || 'MXN',
-        });
+        setForm({ name: data.name || '' });
       })
       .finally(() => { if (!cancelado) setCargando(false); });
     return () => { cancelado = true; };
@@ -117,27 +111,6 @@ export default function ProfilePage() {
             maxLength={80}
             required
           />
-          <Campo
-            etiqueta="Ciudad de origen"
-            value={form.homeCity}
-            onChange={editarCampo('homeCity')}
-            error={erroresCampo.homeCity || (!ciudadValida ? 'Solo letras y espacios' : undefined)}
-            maxLength={80}
-          />
-          <div>
-            <label htmlFor="preferredCurrency" className="mb-1 block text-menor font-semibold text-tinta-700">
-              Moneda preferida
-            </label>
-            <select
-              id="preferredCurrency"
-              value={form.preferredCurrency}
-              onChange={editarCampo('preferredCurrency')}
-              className="h-11 w-full rounded-md border border-bordeInteractivo bg-superficie px-3 text-cuerpo text-tinta-900 focus:border-azul-600 focus:outline-none"
-            >
-              {MONEDAS.map((moneda) => <option key={moneda} value={moneda}>{moneda}</option>)}
-            </select>
-          </div>
-
           {errorPerfil && (
             <p role="alert" className="rounded-md bg-criticoSuave px-3 py-2 text-menor text-critico">{errorPerfil}</p>
           )}

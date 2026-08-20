@@ -49,7 +49,6 @@ export default function AppLayout() {
 
           {isAuthenticated ? (
             <div className="flex items-center gap-3">
-              <span className="hidden text-menor text-azul-100 sm:inline">MXN</span>
               <Link
                 to="/perfil"
                 className="grid h-8 w-8 place-items-center rounded-full bg-azul-400 text-menor font-bold text-white transition-colors hover:bg-azul-300"
@@ -67,7 +66,6 @@ export default function AppLayout() {
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <span className="hidden text-menor text-azul-100 sm:inline">MXN · Español</span>
               <Link
                 to="/login"
                 className="rounded-md border border-white/50 px-3 py-1.5 text-menor font-semibold text-white hover:bg-white/10"
