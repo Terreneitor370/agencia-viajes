@@ -46,7 +46,7 @@ export default function AddToTripButton({ item, type, tripId = '', onAdded }) {
 
   const resolveTripId = async () => {
     if (!tripId) {
-      setError('Selecciona primero el viaje destino desde el panel.');
+      setError('Elige primero a que viaje quieres agregarlo en el panel de arriba.');
       return '';
     }
 
