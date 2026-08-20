@@ -1,0 +1,27 @@
+# Despliegue en el VPS escolar. Solo el backend corre en Docker: el frontend
+# es un build estatico (apps/frontend/dist) que Nginx sirve directamente,
+# igual que cualquier SPA -- no necesita su propio proceso/contenedor.
+#
+# MySQL vive en el HOST del VPS (127.0.0.1:3306), fuera de Docker. Un
+# contenedor en la red bridge por defecto no puede alcanzar el 127.0.0.1 del
+# host (son namespaces de red distintos), por eso host.docker.internal +
+# extra_hosts: sin esto, DB_HOST=host.docker.internal no resuelve en Linux
+# (a diferencia de Docker Desktop en Mac/Windows, donde ya viene resuelto).
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    container_name: agencia_viajes_backend
+    restart: always
+    env_file:
+      - apps/backend/.env.production
+    environment:
+      - DB_HOST=host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      # Regla de oro del VPS compartido: SIEMPRE 127.0.0.1 en el lado del
+      # host. Nginx (que si corre en el host) es el unico que debe llegar a
+      # este puerto; nunca debe quedar expuesto en todas las interfaces.
+      - "127.0.0.1:3005:3000"
