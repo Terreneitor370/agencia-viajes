@@ -35,6 +35,25 @@ async function refreshSession() {
   return refreshPromise;
 }
 
+// AuthProvider se suscribe a esto para enterarse cuando CUALQUIER llamada
+// descubre que la sesion ya no es valida (ni el refresh la salvo) -- sin
+// esto, isAuthenticated podia quedar "creyendo" que habia sesion mucho
+// despues de que el backend ya la habia cerrado (ej. si la rotacion del
+// refresh token detecto reuso en dos pestañas, o goteo del cookie): la nav
+// seguia mostrando el perfil, ProtectedRoute seguia mostrando la pantalla
+// protegida, y cada llamada de esa pantalla fallaba por separado con su
+// propio "Se requiere iniciar sesion" en vez de mandar a login.
+const sessionExpiredListeners = new Set();
+
+export function onSessionExpired(callback) {
+  sessionExpiredListeners.add(callback);
+  return () => sessionExpiredListeners.delete(callback);
+}
+
+function notifySessionExpired() {
+  sessionExpiredListeners.forEach((callback) => callback());
+}
+
 async function request(path, { method = 'GET', body, signal, retry = true } = {}) {
   const res = await fetch(`${BASE_URL}${path}`, {
     method,
@@ -55,6 +74,7 @@ async function request(path, { method = 'GET', body, signal, retry = true } = {}
 
   const payload = await res.json().catch(() => ({}));
   if (!res.ok) {
+    if (res.status === 401) notifySessionExpired();
     const err = payload.error || {};
     // err.message del backend suele ser generico ("Datos de entrada invalidos"):
     // si Zod mando el detalle de que campo/por que, ese es mas util para mostrar.

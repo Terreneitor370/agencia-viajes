@@ -8,7 +8,7 @@
  * solo evita que el usuario vea opciones que de todos modos le serian negadas.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { api } from '../api/client';
+import { api, onSessionExpired } from '../api/client';
 import { AuthContext } from './authContext';
 
 export default function AuthProvider({ children }) {
@@ -50,6 +50,17 @@ export default function AuthProvider({ children }) {
     })();
     return () => { cancelled = true; };
   }, []);
+
+  // Cualquier llamada, en cualquier pantalla, puede descubrir que la sesion
+  // ya no es valida (ver client.js). Sin esto, isAuthenticated se quedaba
+  // "creyendo" que habia sesion -- la nav seguia en modo logueado y
+  // ProtectedRoute no redirigia a login -- aunque el backend ya la hubiera
+  // cerrado, y cada pantalla mostraba su propio "Se requiere iniciar
+  // sesion" por separado en vez de mandar a login de verdad.
+  useEffect(() => onSessionExpired(() => {
+    setUser(null);
+    setPermissions([]);
+  }), []);
 
   const login = useCallback(async (credentials) => {
     const { data } = await api.post('/auth/login', credentials);
