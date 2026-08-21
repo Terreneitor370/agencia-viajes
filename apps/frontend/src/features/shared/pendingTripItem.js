@@ -59,7 +59,10 @@ function camposPorTipo(item, type) {
         // Seleccionados en SeatSelectionPage.jsx: antes se descartaban al
         // guardar el vuelo en el viaje, aunque la pantalla de asientos ya le
         // mostraba al usuario cual eligio y cuanto costaba de mas.
-        seats: (seatsOut || seatsRet) ? { outbound: seatsOut, return: seatsRet } : null,
+        // extraChargeCents ya viene sumado dentro de unitPriceCents (ver
+        // buildFlightOffer en SeatSelectionPage.jsx): se repite aqui solo
+        // para poder mostrar el desglose en el detalle del viaje.
+        seats: (seatsOut || seatsRet) ? { outbound: seatsOut, return: seatsRet, extraChargeCents: item.seats?.extraChargeCents || 0 } : null,
       },
     };
   }

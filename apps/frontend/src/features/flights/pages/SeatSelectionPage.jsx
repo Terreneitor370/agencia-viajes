@@ -89,18 +89,36 @@ export default function SeatSelectionPage() {
   // armaba su propio objeto por separado y ninguna incluia los asientos
   // elegidos en MapaAsientos.jsx, asi que la seleccion se perdia siempre al
   // guardar el vuelo en el viaje.
-  const buildFlightOffer = () => ({
-    externalId: offerId,
-    origin,
-    destination,
-    departureAt,
-    airline,
-    price: { amount: Number(params.get('priceAmount')) || 0, currency: params.get('priceCurrency') || 'MXN' },
-    provider: params.get('provider') || 'unknown',
-    pricingMode: 'per_person',
-    return: retOrigin ? { departureAt: retDepartureAt } : null,
-    seats: (seatOutbound || seatReturn) ? { outbound: seatOutbound, return: seatReturn } : null,
-  });
+  const buildFlightOffer = () => {
+    // seat.price viene en baseCurrency (la moneda que reporta Duffel para
+    // los asientos), no necesariamente la misma que priceCurrency (la
+    // moneda ya convertida del vuelo) -- currencyRate es la misma tasa que
+    // MapaAsientos.jsx ya usa para mostrar "Costo extra: $X" en pantalla.
+    const seatsChargeRaw = [...(seatOutbound || []), ...(seatReturn || [])]
+      .reduce((sum, s) => sum + (Number(s.price) || 0), 0);
+    const seatsChargeCents = Math.round(seatsChargeRaw * currencyRate * 100);
+
+    // pricingMode 'per_person' solo admite UN precio unitario que se
+    // multiplica por travelers -- no hay forma de cobrarle a cada quien
+    // exactamente el asiento que eligio sin tocar trips.schema.js (el
+    // contrato entre modulos, congelado). Repartir el cargo entre los
+    // viajeros es lo que mantiene el total exacto sin tocar ese contrato.
+    const priceAmountBase = Number(params.get('priceAmount')) || 0;
+    const priceAmount = priceAmountBase + (seatsChargeCents / 100) / travelers;
+
+    return {
+      externalId: offerId,
+      origin,
+      destination,
+      departureAt,
+      airline,
+      price: { amount: priceAmount, currency: params.get('priceCurrency') || 'MXN' },
+      provider: params.get('provider') || 'unknown',
+      pricingMode: 'per_person',
+      return: retOrigin ? { departureAt: retDepartureAt } : null,
+      seats: (seatOutbound || seatReturn) ? { outbound: seatOutbound, return: seatReturn, extraChargeCents: seatsChargeCents } : null,
+    };
+  };
 
   const addToTripAndGoToStays = async () => {
     if (!isAuthenticated) {
