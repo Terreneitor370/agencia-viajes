@@ -28,6 +28,12 @@ const dateOnly = (value) => {
   return String(value).slice(0, 10);
 };
 
+// Mismo patron que trips.schema.js#tripTitle en el backend: letras, numeros,
+// espacios y puntuacion normal de un titulo. Se revisa aqui tambien (ademas
+// del backend) para avisar antes de mandar la peticion, igual que ya se hace
+// abajo con las fechas y el limite de presupuesto.
+const TITLE_PATTERN = /^[\p{L}\p{N}\s'".,!?()&:-]+$/u;
+
 const normalizeTrip = (row) => ({
   id: row.id,
   title: row.title,
@@ -307,11 +313,23 @@ export default function TripsPage() {
     setCreating(true);
     setCreateError('');
 
+    if (!TITLE_PATTERN.test(form.title.trim())) {
+      setCreateError('El titulo solo puede tener letras, numeros, espacios y puntuacion basica.');
+      setCreating(false);
+      return;
+    }
+
     const sanitized = form.budgetLimit.trim().replace(/[\s,$]/g, '');
     const budgetLimit = sanitized ? Number(sanitized) : null;
 
     if (sanitized && (!Number.isFinite(budgetLimit) || budgetLimit < 0)) {
       setCreateError('El limite debe ser un numero valido mayor o igual a 0.');
+      setCreating(false);
+      return;
+    }
+
+    if (budgetLimit != null && budgetLimit > 10_000_000) {
+      setCreateError('El limite no puede superar 10,000,000.');
       setCreating(false);
       return;
     }
