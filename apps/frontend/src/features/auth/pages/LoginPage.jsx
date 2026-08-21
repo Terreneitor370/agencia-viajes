@@ -137,7 +137,7 @@ export default function LoginPage() {
         </div>
 
         <a
-          href={authApi.googleUrl()}
+          href={authApi.googleUrl(irA)}
           className="flex h-11 w-full items-center justify-center gap-2.5 rounded-md border border-bordeInteractivo bg-superficie text-cuerpo font-semibold text-tinta-900 transition-colors hover:bg-lienzo"
         >
           <LogoGoogle />

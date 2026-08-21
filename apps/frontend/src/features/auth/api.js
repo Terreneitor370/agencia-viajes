@@ -20,8 +20,14 @@ export const authApi = {
   forgotPassword: (payload) => api.post('/auth/forgot-password', payload),
   resetPassword: (payload) => api.post('/auth/reset-password', payload),
   // El flujo OAuth es una navegacion completa del navegador, no un fetch:
-  // el intercambio del codigo ocurre en el backend.
-  googleUrl: () => `${import.meta.env.VITE_API_URL || '/api/v1'}/auth/google`,
+  // el intercambio del codigo ocurre en el backend. returnTo (opcional) es a
+  // donde volver despues -- a diferencia del login con correo/contrasena,
+  // que nunca sale de la SPA, aqui se pierde location.state.from en el
+  // camino, asi que el backend lo carga aparte en una cookie de corta vida.
+  googleUrl: (returnTo) => {
+    const base = `${import.meta.env.VITE_API_URL || '/api/v1'}/auth/google`;
+    return returnTo ? `${base}?returnTo=${encodeURIComponent(returnTo)}` : base;
+  },
 };
 
 /** Perfil propio. Distinto de /auth/me: ese trae solo lo que arma el menu, este trae el perfil completo editable. */

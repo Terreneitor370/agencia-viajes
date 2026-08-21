@@ -88,6 +88,18 @@ exports.resetPassword = async (req, res) => {
   return respond.noContent(res);
 };
 
+// Sin esto, quien inicia sesion con Google desde un boton "Agregar al viaje"
+// sin sesion vuelve siempre a FRONTEND_URL (la raiz) en vez de a donde
+// estaba -- a diferencia del login con correo/contrasena, que nunca sale de
+// la SPA y por eso conserva location.state.from solo. Aqui se valida estricto:
+// SOLO una ruta relativa de un solo "/" (nunca "//host" ni "https://host",
+// que serian un open redirect a un sitio ajeno).
+const RUTA_RELATIVA_SEGURA = /^\/(?!\/)\S*$/;
+function rutaReturnToSegura(valor) {
+  const ruta = String(valor || '').slice(0, 300);
+  return RUTA_RELATIVA_SEGURA.test(ruta) ? ruta : null;
+}
+
 /**
  * Inicio del flujo OAuth. El `state` es el token anti-CSRF del flujo: se guarda
  * en una cookie httpOnly de corta vida y se compara al volver. Sin esta
@@ -109,6 +121,9 @@ exports.googleStart = async (req, res) => {
   const cookieOpts = { httpOnly: true, secure: env.isProd, sameSite: 'lax', maxAge: 10 * 60 * 1000, path: '/api/v1/auth' };
   res.cookie('oauth_state', state, cookieOpts);
   res.cookie('oauth_verifier', verifier, cookieOpts);
+
+  const returnTo = rutaReturnToSegura(req.query.returnTo);
+  if (returnTo) res.cookie('oauth_return_to', returnTo, cookieOpts);
 
   const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
   url.searchParams.set('client_id', env.GOOGLE_CLIENT_ID);
@@ -149,9 +164,13 @@ function oauthFailureReason(err) {
 }
 
 exports.googleCallback = async (req, res) => {
+  const returnTo = rutaReturnToSegura(req.cookies?.oauth_return_to);
+  const destinoFinal = returnTo ? `${env.FRONTEND_URL}${returnTo}` : env.FRONTEND_URL;
+
   const clearOAuthCookies = () => {
     res.clearCookie('oauth_state', oauthCookiePath);
     res.clearCookie('oauth_verifier', oauthCookiePath);
+    res.clearCookie('oauth_return_to', oauthCookiePath);
   };
 
   // Google manda `error` (sin `code`) cuando el usuario cancela en su pantalla
@@ -181,7 +200,7 @@ exports.googleCallback = async (req, res) => {
   try {
     const session = await service.googleExchange(code, verifier, req);
     setSessionCookies(res, session);
-    return res.redirect(env.FRONTEND_URL);
+    return res.redirect(destinoFinal);
   } catch (err) {
     logger.security('OAUTH_GOOGLE_FAILED', {
       status: err?.status,

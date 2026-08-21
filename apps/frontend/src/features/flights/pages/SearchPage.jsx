@@ -1,7 +1,7 @@
 /**
  * Buscador de vuelos. DUENO: Kassie (modulo B).
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../../core/auth/useAuth';
 import { flightsApi } from '../api';
@@ -94,9 +94,14 @@ export default function SearchPage() {
   const [airports, setAirports] = useState([]);
   const [trips, setTrips] = useState([]);
   const [tripId, setTripId] = useState(flowTripId);
-  const [state, setState] = useState(() => (memoriaGuardada
+  // Si la memoria vino de la cookie (login con Google, sin resultados por
+  // limite de tamaño -- ver searchSessionMemory.js) hay formulario pero no
+  // offers: se marca para rebuscar de verdad una sola vez al montar, en vez
+  // de mostrar "sin resultados" con un formulario que si tiene datos.
+  const [state, setState] = useState(() => (memoriaGuardada?.offers
     ? { busy: false, error: '', degraded: memoriaGuardada.degraded || false, searched: true }
     : { busy: false, error: '', degraded: false, searched: false }));
+  const rebuscarAlMontar = useRef(memoriaGuardada && !memoriaGuardada.offers ? memoriaGuardada.form : null);
 
   useEffect(() => {
     let mounted = true;
@@ -202,6 +207,27 @@ export default function SearchPage() {
       setState({ busy: false, error: err.message, degraded: false, searched: true });
     }
   };
+
+  useEffect(() => {
+    const f = rebuscarAlMontar.current;
+    if (!f) return;
+    rebuscarAlMontar.current = null;
+    doSearch({
+      tripType: f.tripType,
+      origin: f.origin,
+      destination: f.destination,
+      departureDate: f.departureDate,
+      returnDate: f.returnDate,
+      adults: f.adults,
+      children: f.children,
+      infants: f.infants,
+      cabinClass: f.cabinClass,
+      currency: f.currency,
+    });
+    // Solo al montar, con el formulario ya restaurado de la cookie -- no
+    // depende de nada que cambie despues.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const onSubmit = (event) => {
     event.preventDefault();

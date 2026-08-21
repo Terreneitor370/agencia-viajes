@@ -96,7 +96,10 @@ export default function ExperiencesPage() {
 
   const [results, setResults] = useState(memoriaGuardada?.results || []);
   const [location, setLocation] = useState(memoriaGuardada?.location || null);
-  const [searched, setSearched] = useState(Boolean(memoriaGuardada));
+  // Solo cuenta como "ya buscado" si la memoria trae resultados de verdad
+  // (en memoria de JS): una restauracion desde cookie (login con Google)
+  // solo trae el formulario, y se rebusca de verdad mas abajo.
+  const [searched, setSearched] = useState(Boolean(memoriaGuardada?.results));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -106,6 +109,7 @@ export default function ExperiencesPage() {
   const [addingId, setAddingId] = useState('');
   const [addedByTrip, setAddedByTrip] = useState({});
   const autoSearchDone = useRef(false);
+  const rebuscarAlMontar = useRef(memoriaGuardada && !memoriaGuardada.results ? memoriaGuardada.form : null);
 
   const selectedTrip = useMemo(
     () => trips.find((trip) => trip.id === tripId) || null,
@@ -204,6 +208,15 @@ export default function ExperiencesPage() {
       limitValue: autoSearchPayload.limit,
     });
   }, [autoSearchPayload, runSearch]);
+
+  useEffect(() => {
+    const f = rebuscarAlMontar.current;
+    if (!f) return;
+    rebuscarAlMontar.current = null;
+    runSearch({ cityValue: f.city, interestsValue: f.interests, radiusValue: f.radiusKm, limitValue: f.limit });
+    // Solo al montar, con el formulario ya restaurado de la cookie.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const toggleInterest = (interest) => {
     setInterests((prev) => {

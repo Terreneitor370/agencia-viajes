@@ -127,19 +127,25 @@ export default function StaysPage() {
 
   useEffect(() => {
     if (autoSearchDone.current) return;
-    if (!queryDefaults.city || !queryDefaults.checkIn || !queryDefaults.checkOut) return;
+    // formDefaults (no solo queryDefaults de la URL): tambien cubre el caso
+    // de una busqueda restaurada de la cookie tras login con Google -- ahi
+    // seedOverrides ya trae la ciudad/fechas, pero nunca vinieron en la URL.
+    if (!formDefaults.city || !formDefaults.checkIn || !formDefaults.checkOut) return;
+    // Si ya hay resultados en memoria (restauracion completa, login con
+    // correo/contrasena que nunca salio de la SPA) no hace falta rebuscar.
+    if (stays.length > 0) return;
 
     autoSearchDone.current = true;
     handleSearch({
-      city: queryDefaults.city,
-      checkIn: queryDefaults.checkIn,
-      checkOut: queryDefaults.checkOut,
-      travelers: queryDefaults.travelers,
-      radiusKm: queryDefaults.radiusKm,
-      limit: queryDefaults.limit,
-      currency: queryDefaults.currency,
+      city: formDefaults.city,
+      checkIn: formDefaults.checkIn,
+      checkOut: formDefaults.checkOut,
+      travelers: formDefaults.travelers,
+      radiusKm: formDefaults.radiusKm,
+      limit: formDefaults.limit,
+      currency: formDefaults.currency,
     });
-  }, [queryDefaults, handleSearch]);
+  }, [formDefaults, handleSearch, stays.length]);
 
   const formKey = [
     formDefaults.city,

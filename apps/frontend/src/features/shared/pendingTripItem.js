@@ -2,23 +2,32 @@
  * "Agregar al viaje" pendiente de sesion: se guarda cuando alguien sin login
  * intenta agregar algo, y se completa solo despues de iniciar sesion.
  *
- * En memoria del modulo, NUNCA en localStorage/sessionStorage (regla del
- * proyecto: nada de eso, la sesion vive solo en cookies httpOnly). Encaja
- * bien ademas: esta intencion no deberia sobrevivir un cierre de pestana,
- * solo la navegacion de ida y vuelta a /login dentro de la misma SPA.
+ * En memoria del modulo como via principal (rapido, y de entrada no
+ * sobrevive un cierre de pestana). Respaldado ademas en una cookie de corta
+ * vida (ver clientCookie.js -- NUNCA localStorage/sessionStorage, eso si lo
+ * prohibe la regla del proyecto) porque el login con Google exige salir de
+ * la SPA por completo hacia accounts.google.com y volver por un redirect
+ * del servidor: eso borra la memoria de JS igual que cerrar la pestana, y
+ * sin este respaldo el intento quedaba huerfano (Isa lo reporto: "me
+ * logueo con Google y no se guarda nada del viaje").
  */
+import { borrarCookie, guardarCookie, leerCookie } from './clientCookie';
+
+const COOKIE_PENDIENTE = 'viaja_pendiente';
 let pendiente = null;
 
 export function guardarPendiente(item, type, tripId = '') {
   pendiente = { item, type, tripId: tripId || '' };
+  guardarCookie(COOKIE_PENDIENTE, pendiente);
 }
 
 export function leerPendiente() {
-  return pendiente;
+  return pendiente || leerCookie(COOKIE_PENDIENTE);
 }
 
 export function limpiarPendiente() {
   pendiente = null;
+  borrarCookie(COOKIE_PENDIENTE);
 }
 
 /** Campos que dependen del tipo de resultado (vuelo, hospedaje, o cualquier otro). */
