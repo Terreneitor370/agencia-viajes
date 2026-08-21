@@ -56,7 +56,10 @@ async function request(path, { method = 'GET', body, signal, retry = true } = {}
   const payload = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err = payload.error || {};
-    throw new ApiError(res.status, err.code || 'UNKNOWN', err.message || 'Error en la solicitud', err.details);
+    // err.message del backend suele ser generico ("Datos de entrada invalidos"):
+    // si Zod mando el detalle de que campo/por que, ese es mas util para mostrar.
+    const mensaje = err.details?.[0]?.message || err.message || 'Error en la solicitud';
+    throw new ApiError(res.status, err.code || 'UNKNOWN', mensaje, err.details);
   }
   return payload;
 }
