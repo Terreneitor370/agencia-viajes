@@ -30,11 +30,19 @@ export function limpiarPendiente() {
   borrarCookie(COOKIE_PENDIENTE);
 }
 
+/** Reduce los asientos de MapaAsientos.jsx (designator, available, price, currency,
+ * disclosures, name) a solo lo que vale la pena guardar en el itinerario. */
+function resumenAsientos(seats) {
+  return seats?.length ? seats.map((s) => ({ designator: s.designator, price: s.price || 0, currency: s.currency || null })) : null;
+}
+
 /** Campos que dependen del tipo de resultado (vuelo, hospedaje, o cualquier otro). */
 function camposPorTipo(item, type) {
   if (type === 'flight') {
     const originCity = item.originCity || item.origin || '';
     const destinationCity = item.destinationCity || item.destination || '';
+    const seatsOut = resumenAsientos(item.seats?.outbound);
+    const seatsRet = resumenAsientos(item.seats?.return);
     return {
       title: `${item.origin} → ${item.destination} (${item.airline})`,
       unitPriceCents: Math.round(item.price.amount * 100),
@@ -48,6 +56,10 @@ function camposPorTipo(item, type) {
         destinationCity,
         departureAt: item.departureAt || null,
         returnDepartureAt: item.return?.departureAt || null,
+        // Seleccionados en SeatSelectionPage.jsx: antes se descartaban al
+        // guardar el vuelo en el viaje, aunque la pantalla de asientos ya le
+        // mostraba al usuario cual eligio y cuanto costaba de mas.
+        seats: (seatsOut || seatsRet) ? { outbound: seatsOut, return: seatsRet } : null,
       },
     };
   }

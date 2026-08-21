@@ -120,7 +120,14 @@ function ItineraryRow({ item, tripStats, defaultCurrency, showRemove = false, re
     ? `Reservada para ${fechaCorta(item.meta.reservationDate)}`
     : '';
 
-  const detailLabel = [routeLabel, placeLabel, reservationDateLabel].filter(Boolean).join(' · ');
+  const seatsLabel = item.type === 'flight' && item.meta?.seats
+    ? [
+        item.meta.seats.outbound?.length ? `Asiento ida ${item.meta.seats.outbound.map((s) => s.designator).join(', ')}` : '',
+        item.meta.seats.return?.length ? `regreso ${item.meta.seats.return.map((s) => s.designator).join(', ')}` : '',
+      ].filter(Boolean).join(' · ')
+    : '';
+
+  const detailLabel = [routeLabel, placeLabel, reservationDateLabel, seatsLabel].filter(Boolean).join(' · ');
 
   return (
     <li className="border-b border-borde px-4 py-3 last:border-b-0">

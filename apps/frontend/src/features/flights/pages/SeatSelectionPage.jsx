@@ -85,21 +85,27 @@ export default function SeatSelectionPage() {
     return `/hospedaje?${next.toString()}`;
   };
 
+  // Comun a ambas ramas de abajo (con sesion y sin sesion): antes cada una
+  // armaba su propio objeto por separado y ninguna incluia los asientos
+  // elegidos en MapaAsientos.jsx, asi que la seleccion se perdia siempre al
+  // guardar el vuelo en el viaje.
+  const buildFlightOffer = () => ({
+    externalId: offerId,
+    origin,
+    destination,
+    departureAt,
+    airline,
+    price: { amount: Number(params.get('priceAmount')) || 0, currency: params.get('priceCurrency') || 'MXN' },
+    provider: params.get('provider') || 'unknown',
+    pricingMode: 'per_person',
+    return: retOrigin ? { departureAt: retDepartureAt } : null,
+    seats: (seatOutbound || seatReturn) ? { outbound: seatOutbound, return: seatReturn } : null,
+  });
+
   const addToTripAndGoToStays = async () => {
     if (!isAuthenticated) {
-      const flightItem = {
-        externalId: offerId,
-        origin,
-        destination,
-        departureAt,
-        airline,
-        price: { amount: Number(params.get('priceAmount')) || 0, currency: params.get('priceCurrency') || 'MXN' },
-        provider: params.get('provider') || 'unknown',
-        pricingMode: 'per_person',
-        return: retOrigin ? { departureAt: retDepartureAt } : null,
-      };
       const returnTo = `/asientos?${params.toString()}`;
-      guardarPendiente(flightItem, 'flight', tripId, returnTo);
+      guardarPendiente(buildFlightOffer(), 'flight', tripId, returnTo);
       navigate('/login');
       return;
     }
@@ -108,18 +114,7 @@ export default function SeatSelectionPage() {
     setSaving(true);
     setSaveError('');
     try {
-      const offer = {
-        externalId: offerId,
-        origin,
-        destination,
-        departureAt,
-        airline,
-        price: { amount: Number(params.get('priceAmount')) || 0, currency: params.get('priceCurrency') || 'MXN' },
-        provider: params.get('provider') || 'unknown',
-        pricingMode: 'per_person',
-        return: retOrigin ? { departureAt: retDepartureAt } : null,
-      };
-      await api.post(`/trips/${tripId}/items`, construirPayload(offer, 'flight'));
+      await api.post(`/trips/${tripId}/items`, construirPayload(buildFlightOffer(), 'flight'));
 
       if (flow === 'replace' && replaceItemId) {
         const { tripsApi } = await import('../api');
