@@ -5,8 +5,29 @@ const stripe = env.STRIPE_SECRET_KEY ? require('stripe')(env.STRIPE_SECRET_KEY) 
 const db = require('../../core/db');
 const ApiError = require('../../core/ApiError');
 const logger = require('../../core/logger');
+const { enviarComprobante } = require('./payments.email');
 
 const FRONTEND_URL = env.FRONTEND_URL || 'http://localhost:5173';
+
+/**
+ * Manda el comprobante por correo. Nunca se espera (fire-and-forget) desde
+ * quien la llama: el webhook de Stripe y las rutas de confirmacion necesitan
+ * responder rapido, y un correo lento (o que falle) no debe demorar ni
+ * tumbar esa respuesta -- el pago ya sucedio de todas formas.
+ */
+async function notificarComprobante(orderId, userId) {
+  try {
+    const [user, order, items] = await Promise.all([
+      db.queryOne('SELECT email FROM users WHERE id = ?', [userId]),
+      db.queryOne('SELECT * FROM orders WHERE id = ?', [orderId]),
+      db.query('SELECT * FROM order_items WHERE order_id = ?', [orderId]),
+    ]);
+    if (!user?.email || !order) return;
+    await enviarComprobante(user.email, order, items);
+  } catch (err) {
+    logger.warn('No se pudo enviar el comprobante de pago', { orderId, message: err.message });
+  }
+}
 
 function assertStripeConfigured() {
   if (!stripe) {
@@ -137,13 +158,15 @@ async function handleWebhook(rawBody, signature) {
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
     const orderId = session.metadata?.orderId;
+    const userId = session.metadata?.userId;
     if (orderId) {
-      await db.query(
+      const result = await db.query(
         `UPDATE orders SET status = 'paid', stripe_payment_intent = ?
          WHERE id = ? AND status = 'pending'`,
         [session.payment_intent, orderId],
       );
       logger.info('Orden pagada', { orderId, sessionId: session.id });
+      if (result.affectedRows > 0 && userId) notificarComprobante(orderId, userId);
     }
   }
 
@@ -175,12 +198,13 @@ async function getOrderStatus(orderId, userId) {
     try {
       const session = await stripe.checkout.sessions.retrieve(order.stripe_session_id);
       if (session.payment_status === 'paid') {
-        await db.query(
+        const result = await db.query(
           "UPDATE orders SET status = 'paid', stripe_payment_intent = ? WHERE id = ? AND status = 'pending'",
           [session.payment_intent, order.id],
         );
         order.status = 'paid';
         order.stripe_payment_intent = session.payment_intent;
+        if (result.affectedRows > 0) notificarComprobante(order.id, userId);
       } else if (session.status === 'expired') {
         await db.query("UPDATE orders SET status = 'failed' WHERE id = ? AND status = 'pending'", [order.id]);
         order.status = 'failed';
@@ -208,12 +232,13 @@ async function getOrderBySession(sessionId, userId) {
     try {
       const session = await stripe.checkout.sessions.retrieve(order.stripe_session_id);
       if (session.payment_status === 'paid') {
-        await db.query(
+        const result = await db.query(
           "UPDATE orders SET status = 'paid', stripe_payment_intent = ? WHERE id = ? AND status = 'pending'",
           [session.payment_intent, order.id],
         );
         order.status = 'paid';
         order.stripe_payment_intent = session.payment_intent;
+        if (result.affectedRows > 0) notificarComprobante(order.id, userId);
       } else if (session.status === 'expired') {
         await db.query("UPDATE orders SET status = 'failed' WHERE id = ? AND status = 'pending'", [order.id]);
         order.status = 'failed';
@@ -323,12 +348,13 @@ async function confirmOrder(orderId, userId) {
     try {
       const pi = await stripe.paymentIntents.retrieve(order.stripe_session_id);
       if (pi.status === 'succeeded') {
-        await db.query(
+        const result = await db.query(
           "UPDATE orders SET status = 'paid', stripe_payment_intent = ? WHERE id = ? AND status = 'pending'",
           [pi.id, order.id],
         );
         order.status = 'paid';
         order.stripe_payment_intent = pi.id;
+        if (result.affectedRows > 0) notificarComprobante(order.id, userId);
       }
     } catch (err) {
       logger.warn('No se pudo confirmar orden con Stripe', { orderId: order.id, error: err.message });
