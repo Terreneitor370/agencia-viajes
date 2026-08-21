@@ -155,8 +155,26 @@ sudo systemctl reload nginx
 sudo certbot --nginx -d agencia-viajes.idgs8-2.tech
 ```
 
-Si despues de esto el sitio da 403 Forbidden en vez de cargar, es
-justamente este tema de permisos -- revisa con
+`deploy/nginx.agencia-viajes.conf` ya incluye el bloque HTTPS que agrega
+Certbot (se capturo del servidor real la primera vez que se corrio), asi
+que **este `certbot --nginx` de la primera instalacion no hace falta
+repetirlo despues** -- el `cp` de arriba ya trae el HTTPS puesto. Si de
+todos modos lo vuelves a correr, Certbot detecta el certificado existente
+y solo pregunta si reinstalarlo (opcion 1) o renovarlo (opcion 2); la 1 no
+tiene riesgo.
+
+⚠️ **No copies una version vieja de este archivo por encima de la que
+esta en el servidor.** Ya nos paso: un `cp` de una copia que no traia el
+bloque SSL borro el HTTPS de produccion sin avisar, y como el navegador ya
+traia HSTS guardado de una visita anterior, siguio insistiendo en
+conectarse por 443 -- y como agencia-viajes ya no tenia nada ahi, Nginx
+sirvio el primer sitio de OTRO compañero que si tenia el 443 configurado
+en este VPS compartido. Si necesitas editar este archivo, parte siempre
+de `cat /etc/nginx/sites-enabled/agencia-viajes` en el servidor (la
+version real, con Certbot incluido), no de una copia local vieja.
+
+Si despues de un deploy el sitio da 403 Forbidden en vez de cargar, es
+el tema de permisos del paso anterior -- revisa con
 `sudo -u www-data test -r /home/terreneitor370/agencia-viajes/apps/frontend/dist/index.html && echo OK || echo SIN PERMISO`.
 
 **Importante:** las cookies de sesion se marcan `Secure` en produccion
@@ -184,7 +202,14 @@ npm ci                               # por si alguien agrego una dependencia nue
 npm run db:migrate -w apps/backend   # solo si hay migraciones nuevas
 npm run build -w apps/frontend       # solo si cambio el frontend
 sudo docker compose up -d --build    # solo si cambio el backend (el npm ci del backend corre DENTRO del build de Docker, no depende de este)
-sudo systemctl reload nginx          # solo si cambio deploy/nginx.agencia-viajes.conf
+
+# Solo si cambio deploy/nginx.agencia-viajes.conf -- SIEMPRE los dos
+# comandos juntos, el reload solo no sirve de nada si no se copio primero
+# el archivo actualizado (y ya trae el bloque HTTPS de Certbot, ver el
+# aviso mas arriba: es seguro volver a copiarlo, no hace falta certbot):
+sudo cp deploy/nginx.agencia-viajes.conf /etc/nginx/sites-available/agencia-viajes
+sudo nginx -t
+sudo systemctl reload nginx
 ```
 
 `npm ci` en la raiz es rapido si nada cambio (solo valida el lockfile), y evita el error de "Cannot find module" si alguien agrego un paquete y se les olvido avisar.
