@@ -248,7 +248,7 @@ async function getSeatMap(offerId) {
                   designator: el.designator,
                   available: Boolean(svc),
                   price: svc ? Number(svc.total_amount) : 0,
-                  currency: svc?.total_currency || seatMap.cabins?.[0]?.cabin?.cabin_configuration ? 'USD' : 'USD',
+                  currency: svc?.total_currency || 'USD',
                   disclosures: el.disclosures || [],
                   name: el.name || null,
                 });
