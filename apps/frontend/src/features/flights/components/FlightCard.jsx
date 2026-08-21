@@ -27,7 +27,7 @@ const layoverText = (layover) => {
   return `${where}${wait ? ` · espera ${wait}` : ''}`;
 };
 
-export default function FlightCard({ offer, travelers = 1, tripId = '', onAdded }) {
+export default function FlightCard({ offer, travelers = 1, tripId = '', sinViajes = false, onAdded }) {
   const total = offer.price.amount * travelers;
   const baggage = offer.baggage || {};
   const hasBaggage = (baggage.carryOn || 0) + (baggage.checked || 0) > 0;
@@ -116,10 +116,11 @@ export default function FlightCard({ offer, travelers = 1, tripId = '', onAdded 
         </p>
 
         <div className="mt-3">
-          <AddToTripButton 
-            item={offer} 
+          <AddToTripButton
+            item={offer}
             type="flight"
             tripId={tripId}
+            sinViajes={sinViajes}
             onAdded={onAdded}
           />
         </div>

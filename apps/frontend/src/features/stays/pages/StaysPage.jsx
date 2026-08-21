@@ -294,6 +294,7 @@ export default function StaysPage() {
         searched={searched}
         error={error}
         tripId={tripId}
+        sinViajes={isAuthenticated && trips.length === 0}
         onStayAdded={onStayAdded}
       />
     </div>

@@ -1,6 +1,6 @@
 import StayCard from './StayCard';
 
-export default function StayResults({ stays, loading, metadata, searched, error, tripId = '', onStayAdded }) {
+export default function StayResults({ stays, loading, metadata, searched, error, tripId = '', sinViajes = false, onStayAdded }) {
   if (loading) {
     return (
       <div className="space-y-3" aria-busy="true" aria-live="polite">
@@ -47,6 +47,7 @@ export default function StayResults({ stays, loading, metadata, searched, error,
             stay={stay}
             nights={metadata.nights}
             tripId={tripId}
+            sinViajes={sinViajes}
             onAdded={onStayAdded}
           />
         ))}

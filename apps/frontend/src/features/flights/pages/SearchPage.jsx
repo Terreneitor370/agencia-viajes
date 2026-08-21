@@ -561,6 +561,7 @@ export default function SearchPage() {
               offer={enrichedOffer}
               travelers={totalTravelers}
               tripId={tripId}
+              sinViajes={isAuthenticated && trips.length === 0}
               onAdded={onFlightAdded}
             />
           );

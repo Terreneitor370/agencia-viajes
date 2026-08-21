@@ -32,7 +32,7 @@ function tripPatchFromFlight(item) {
   return patch;
 }
 
-export default function AddToTripButton({ item, type, tripId = '', onAdded }) {
+export default function AddToTripButton({ item, type, tripId = '', sinViajes = false, onAdded }) {
   const { isAuthenticated, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -116,6 +116,15 @@ export default function AddToTripButton({ item, type, tripId = '', onAdded }) {
       return;
     }
 
+    // Sin ningun viaje editable no hay nada que "elegir en el panel de
+    // arriba" -- ese panel ni siquiera se dibuja en este caso (Isa lo
+    // reporto: el mensaje generico no tenia sentido aqui). Se manda
+    // directo a crear uno, igual que el aviso ambar de la misma pantalla.
+    if (sinViajes) {
+      navigate('/viajes');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setSuccess(false);
@@ -153,7 +162,7 @@ export default function AddToTripButton({ item, type, tripId = '', onAdded }) {
         disabled={loading || authLoading}
         className="border-ambar-400 text-ambar-900 hover:bg-ambar-50"
       >
-        {loading ? 'Agregando...' : 'Agregar al viaje'}
+        {loading ? 'Agregando...' : (sinViajes ? 'Crear viaje' : 'Agregar al viaje')}
       </Boton>
       {error && (
         <span className="text-critico text-xs">{error}</span>
