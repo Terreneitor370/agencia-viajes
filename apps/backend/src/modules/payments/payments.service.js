@@ -17,13 +17,27 @@ const FRONTEND_URL = env.FRONTEND_URL || 'http://localhost:5173';
  */
 async function notificarComprobante(orderId, userId) {
   try {
-    const [user, order, items] = await Promise.all([
+    const [user, order] = await Promise.all([
       db.queryOne('SELECT email FROM users WHERE id = ?', [userId]),
       db.queryOne('SELECT * FROM orders WHERE id = ?', [orderId]),
-      db.query('SELECT * FROM order_items WHERE order_id = ?', [orderId]),
     ]);
     if (!user?.email || !order) return;
-    await enviarComprobante(user.email, order, items);
+
+    // ti.type/ti.meta (no viven en order_items) son lo que arma el
+    // itinerario por dia: dayIndex solo lo traen las experiencias, que son
+    // las unicas con fecha de reservacion propia (ver payments.email.js).
+    const [items, trip] = await Promise.all([
+      db.query(
+        `SELECT oi.title, oi.subtotal_cents, oi.quantity, ti.type, ti.meta
+           FROM order_items oi
+           JOIN trip_items ti ON ti.id = oi.trip_item_id
+          WHERE oi.order_id = ?`,
+        [orderId],
+      ),
+      db.queryOne('SELECT start_date, end_date FROM trips WHERE id = ?', [order.trip_id]),
+    ]);
+
+    await enviarComprobante(user.email, order, items, trip);
   } catch (err) {
     logger.warn('No se pudo enviar el comprobante de pago', { orderId, message: err.message });
   }
