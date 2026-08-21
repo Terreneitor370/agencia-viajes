@@ -1,5 +1,3 @@
-import AddToTripButton from '../../shared/AddToTripButton';
-
 const money = (amount, currency) =>
   new Intl.NumberFormat('es-MX', { style: 'currency', currency }).format(amount);
 
@@ -27,7 +25,7 @@ const layoverText = (layover) => {
   return `${where}${wait ? ` · espera ${wait}` : ''}`;
 };
 
-export default function FlightCard({ offer, travelers = 1, tripId = '', sinViajes = false, onAdded }) {
+export default function FlightCard({ offer, travelers = 1, onSelect }) {
   const total = offer.price.amount * travelers;
   const baggage = offer.baggage || {};
   const hasBaggage = (baggage.carryOn || 0) + (baggage.checked || 0) > 0;
@@ -116,13 +114,13 @@ export default function FlightCard({ offer, travelers = 1, tripId = '', sinViaje
         </p>
 
         <div className="mt-3">
-          <AddToTripButton
-            item={offer}
-            type="flight"
-            tripId={tripId}
-            sinViajes={sinViajes}
-            onAdded={onAdded}
-          />
+          <button
+            type="button"
+            onClick={() => onSelect?.(offer)}
+            className="rounded-md bg-azul-600 px-4 py-2 text-sm font-medium text-white hover:bg-azul-700 active:bg-azul-800"
+          >
+            Seleccionar este vuelo
+          </button>
         </div>
       </div>
     </article>

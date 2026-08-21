@@ -217,4 +217,60 @@ async function searchOffers({ origin, destination, departureDate, returnDate, ad
   return offers;
 }
 
-module.exports = { searchOffers, normalize };
+/**
+ * Obtiene el mapa de asientos de una oferta de Duffel.
+ * No todas las aerolíneas lo soportan; si no hay datos, devuelve null.
+ */
+async function getSeatMap(offerId) {
+  if (!env.DUFFEL_API_TOKEN) {
+    throw ApiError.upstream('Proveedor de vuelos no configurado');
+  }
+
+  try {
+    const result = await httpClient.request({
+      url: `${BASE_URL}/air/seat_maps?offer_id=${offerId}`,
+      method: 'GET',
+      headers: headers(),
+      timeoutMs: 10000,
+    });
+
+    if (!result?.data?.length) return null;
+
+    return result.data.map((seatMap) => {
+      const cabins = (seatMap.cabins || []).map((cabin) => {
+        const rows = (cabin.rows || []).map((row) => {
+          const seats = [];
+          for (const section of row.sections || []) {
+            for (const el of section.elements || []) {
+              if (el.type === 'seat') {
+                const svc = el.available_services?.[0];
+                seats.push({
+                  designator: el.designator,
+                  available: Boolean(svc),
+                  price: svc ? Number(svc.total_amount) : 0,
+                  currency: svc?.total_currency || seatMap.cabins?.[0]?.cabin?.cabin_configuration ? 'USD' : 'USD',
+                  disclosures: el.disclosures || [],
+                  name: el.name || null,
+                });
+              }
+            }
+          }
+          return { seats };
+        });
+        return {
+          cabinClass: cabin.cabin?.cabin_class || null,
+          deck: cabin.cabin?.deck || null,
+          rows,
+          aisles: cabin.cabin?.aisles || 0,
+          wings: cabin.wings || null,
+        };
+      });
+      return { sliceId: seatMap.slice_id, segmentId: seatMap.segment_id, cabins };
+    });
+  } catch (err) {
+    logger.warn('No se pudo obtener mapa de asientos', { offerId, error: err.message });
+    return null;
+  }
+}
+
+module.exports = { searchOffers, normalize, getSeatMap };

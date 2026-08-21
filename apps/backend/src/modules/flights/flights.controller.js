@@ -28,6 +28,23 @@ exports.search = async (req, res) => {
   return respond.ok(res, offers, { degraded, count: offers.length });
 };
 
+/** Mapa de asientos de una oferta de Duffel. */
+exports.seatMap = async (req, res) => {
+  const seatMap = await service.getSeatMap(req.query.offer_id);
+  if (!seatMap) {
+    return respond.ok(res, null, { message: 'Mapa de asientos no disponible para esta oferta' });
+  }
+  return respond.ok(res, seatMap);
+};
+
+/** Verifica qué ofertas tienen mapa de asientos (batch). */
+exports.checkSeatMaps = async (req, res) => {
+  const ids = String(req.query.offer_ids || '').split(',').filter(Boolean).slice(0, 20);
+  if (ids.length === 0) return respond.ok(res, {});
+  const result = await service.checkSeatMaps(ids);
+  return respond.ok(res, result);
+};
+
 /**
  * Registro de busqueda en `search_history` (tabla del modulo B).
  * Nunca debe romper la busqueda: si falla, solo se registra en el log.

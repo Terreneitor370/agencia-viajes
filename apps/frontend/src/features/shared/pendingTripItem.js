@@ -16,8 +16,8 @@ import { borrarCookie, guardarCookie, leerCookie } from './clientCookie';
 const COOKIE_PENDIENTE = 'viaja_pendiente';
 let pendiente = null;
 
-export function guardarPendiente(item, type, tripId = '') {
-  pendiente = { item, type, tripId: tripId || '' };
+export function guardarPendiente(item, type, tripId = '', continueUrl = '') {
+  pendiente = { item, type, tripId: tripId || '', continueUrl: continueUrl || '' };
   guardarCookie(COOKIE_PENDIENTE, pendiente);
 }
 

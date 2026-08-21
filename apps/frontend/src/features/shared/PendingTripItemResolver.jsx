@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../../core/api/client';
 import { useAuth } from '../../core/auth/useAuth';
 import { construirPayload, leerPendiente, limpiarPendiente } from './pendingTripItem';
@@ -44,6 +45,7 @@ function tripPatchFromFlight(item) {
  */
 export default function PendingTripItemResolver() {
   const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const [aviso, setAviso] = useState(null);
 
   useEffect(() => {
@@ -54,6 +56,11 @@ export default function PendingTripItemResolver() {
 
     (async () => {
       try {
+        if (pendiente.continueUrl) {
+          navigate(pendiente.continueUrl);
+          return;
+        }
+
         const tripsRes = await api.get('/trips');
         const trips = tripsRes.data || [];
         const editableTrips = trips.filter((trip) => !(trip.is_paid ?? trip.isPaid));

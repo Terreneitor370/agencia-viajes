@@ -73,4 +73,30 @@ async function search(params) {
   }
 }
 
-module.exports = { search };
+/**
+ * Obtiene el mapa de asientos de una oferta de Duffel.
+ * Si el proveedor no está configurado o la aerolínea no lo soporta, devuelve null.
+ */
+async function getSeatMap(offerId) {
+  return duffel.getSeatMap(offerId);
+}
+
+/**
+ * Verifica en paralelo qué ofertas tienen mapa de asientos disponible.
+ * Devuelve un mapa { offerId: true/false }.
+ */
+async function checkSeatMaps(offerIds) {
+  const results = await Promise.allSettled(
+    offerIds.map(async (id) => {
+      const map = await duffel.getSeatMap(id);
+      return { id, available: Boolean(map?.length) };
+    }),
+  );
+  const out = {};
+  for (const r of results) {
+    if (r.status === 'fulfilled') out[r.value.id] = r.value.available;
+  }
+  return out;
+}
+
+module.exports = { search, getSeatMap, checkSeatMaps };

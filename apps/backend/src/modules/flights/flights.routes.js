@@ -6,6 +6,7 @@ const { externalApiLimiter } = require('../../middlewares/rateLimit');
 const asyncHandler = require('../../core/asyncHandler');
 const { searchFlightsSchema } = require('./flights.schema');
 const controller = require('./flights.controller');
+const { z } = require('zod');
 
 const router = Router();
 
@@ -19,6 +20,18 @@ router.get('/airports', optionalAuth, externalApiLimiter, asyncHandler(controlle
 // Tasa de cambio para convertir precios sin re-buscar. Tambien consume un
 // proveedor externo (Frankfurter): mismo limite que /search y /airports.
 router.get('/rates', optionalAuth, externalApiLimiter, asyncHandler(controller.rates));
+
+// Mapa de asientos de una oferta (requiere offer_id de una busqueda previa).
+router.get('/seat-map', optionalAuth, externalApiLimiter,
+  validate({ query: z.object({ offer_id: z.string().min(1, 'offer_id es requerido') }) }),
+  asyncHandler(controller.seatMap),
+);
+
+// Verifica en batch qué ofertas tienen mapa de asientos.
+router.get('/seat-map/check', optionalAuth, externalApiLimiter,
+  validate({ query: z.object({ offer_ids: z.string().min(1) }) }),
+  asyncHandler(controller.checkSeatMaps),
+);
 
 const openapiPaths = {
   '/search': {

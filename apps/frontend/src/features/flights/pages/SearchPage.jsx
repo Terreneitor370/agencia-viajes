@@ -31,6 +31,9 @@ const addDays = (iso, days) => {
   return date.toISOString().slice(0, 10);
 };
 
+const time = (iso) =>
+  iso ? new Date(iso).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : '--';
+
 const initialForm = (seed = {}) => ({
   tripType: 'round_trip',
   origin: seed.origin || '',
@@ -93,15 +96,14 @@ export default function SearchPage() {
   const [offers, setOffers] = useState(() => memoriaGuardada?.offers || []);
   const [airports, setAirports] = useState([]);
   const [trips, setTrips] = useState([]);
+  const [tripsLoading, setTripsLoading] = useState(true);
   const [tripId, setTripId] = useState(flowTripId);
-  // Si la memoria vino de la cookie (login con Google, sin resultados por
-  // limite de tamaño -- ver searchSessionMemory.js) hay formulario pero no
-  // offers: se marca para rebuscar de verdad una sola vez al montar, en vez
-  // de mostrar "sin resultados" con un formulario que si tiene datos.
-  const [state, setState] = useState(() => (memoriaGuardada?.offers
+  const memoriaGuardadaOffers = memoriaGuardada?.offers;
+  const [state, setState] = useState(() => (memoriaGuardadaOffers
     ? { busy: false, error: '', degraded: memoriaGuardada.degraded || false, searched: true }
     : { busy: false, error: '', degraded: false, searched: false }));
-  const rebuscarAlMontar = useRef(memoriaGuardada && !memoriaGuardada.offers ? memoriaGuardada.form : null);
+  const rebuscarAlMontar = useRef(memoriaGuardada && !memoriaGuardadaOffers ? memoriaGuardada.form : null);
+  const [baseCurrency, setBaseCurrency] = useState('');
 
   useEffect(() => {
     let mounted = true;
@@ -117,16 +119,19 @@ export default function SearchPage() {
     const loadTrips = async () => {
       if (!isAuthenticated) {
         setTrips([]);
+        setTripsLoading(false);
         setTripId(flowTripId || '');
         return;
       }
 
+      setTripsLoading(true);
       try {
         const res = await tripsApi.list({ page: 1, pageSize: 50 });
         if (cancelled) return;
         const rows = Array.isArray(res.data) ? res.data.map(normalizeTrip) : [];
         const editableRows = rows.filter((row) => !row.isPaid);
         setTrips(editableRows);
+        setTripsLoading(false);
         setTripId((prev) => {
           if (flowTripId && editableRows.some((row) => row.id === flowTripId)) return flowTripId;
           if (prev && editableRows.some((row) => row.id === prev)) return prev;
@@ -135,6 +140,7 @@ export default function SearchPage() {
       } catch {
         if (cancelled) return;
         setTrips([]);
+        setTripsLoading(false);
         setTripId(flowTripId || '');
       }
     };
@@ -184,7 +190,7 @@ export default function SearchPage() {
     const next = e.target.value;
     setForm((f) => ({ ...f, currency: next }));
     if (offers.length === 0) return;
-    const from = offers[0].price.currency;
+    const from = baseCurrency || offers[0].price.currency;
     if (from === next) return;
     try {
       const r = await getRate(from, next);
@@ -199,9 +205,19 @@ export default function SearchPage() {
     setState({ busy: true, error: '', degraded: false, searched: true });
     try {
       const res = await flightsApi.search(payload);
-      setOffers(res.data);
+      let offers = res.data;
+      if (offers.length > 0 && !offers[0].estimated) {
+        try {
+          const checkRes = await flightsApi.checkSeatMaps(offers.map((o) => o.externalId));
+          const withSeats = offers.filter((o) => checkRes.data?.[o.externalId]);
+          if (withSeats.length > 0) offers = withSeats;
+        } catch { }
+      }
+      setOffers(offers);
+      if (offers.length > 0) setBaseCurrency(offers[0].price.currency);
+      offers.slice(0, 5).forEach((o) => flightsApi.preloadSeatMap(o.externalId));
       setState({ busy: false, error: '', degraded: Boolean(res.degraded), searched: true });
-      guardarBusqueda('flights', { form, offers: res.data, degraded: Boolean(res.degraded) });
+      guardarBusqueda('flights', { form, offers, degraded: Boolean(res.degraded) });
     } catch (err) {
       setOffers([]);
       setState({ busy: false, error: err.message, degraded: false, searched: true });
@@ -254,6 +270,45 @@ export default function SearchPage() {
     setForm((f) => ({ ...f, origin, destination }));
   };
 
+  const buildSeatSelectionUrl = (offer) => {
+    const destinationCity = cityFromCode(offer.destinationCity || offer.destination);
+    const checkIn = form.departureDate;
+    const checkOut = form.returnDate || addDays(form.departureDate || todayStr, 1);
+
+    const next = new URLSearchParams();
+    next.set('tripId', tripId || flowTripId);
+    next.set('flow', flowEnabled ? 'create' : replaceFlightFlow ? 'replace' : '');
+    next.set('city', destinationCity);
+    next.set('travelers', String(totalTravelers));
+    next.set('currency', form.currency);
+    if (checkIn) next.set('checkIn', checkIn);
+    if (checkOut) next.set('checkOut', checkOut);
+    next.set('offerId', offer.externalId || '');
+    next.set('origin', offer.origin || '');
+    next.set('destination', offer.destination || '');
+    next.set('departureAt', offer.departureAt || '');
+    next.set('airline', offer.airline || '');
+    next.set('priceAmount', String(offer.price?.amount || 0));
+    next.set('priceCurrency', offer.price?.currency || 'MXN');
+    next.set('provider', offer.provider || 'unknown');
+    if (offer.return) {
+      next.set('retOrigin', offer.return.origin || '');
+      next.set('retDestination', offer.return.destination || '');
+      next.set('retDepartureAt', offer.return.departureAt || '');
+    }
+    if (replaceFlightFlow) {
+      next.set('replaceTarget', replaceTarget || '');
+      next.set('replaceItemId', searchParams.get('replaceItemId') || '');
+      next.set('returnTo', searchParams.get('returnTo') || '');
+    }
+    next.set('backParams', searchParams.toString());
+    return `/asientos?${next.toString()}`;
+  };
+
+  const onSelectFlight = (offer) => {
+    navigate(buildSeatSelectionUrl(offer));
+  };
+
   const onFlightAdded = (offer, context = {}) => {
     const targetTripId = context.tripId || tripId || flowTripId;
     if (!targetTripId) return;
@@ -282,23 +337,6 @@ export default function SearchPage() {
         });
       return;
     }
-
-    if (!flowEnabled) return;
-
-    const destinationCity = cityFromCode(offer.destinationCity || offer.destination);
-    const checkIn = form.departureDate;
-    const checkOut = form.returnDate || addDays(form.departureDate || todayStr, 1);
-
-    const next = new URLSearchParams();
-    next.set('tripId', targetTripId);
-    next.set('flow', 'create');
-    next.set('city', destinationCity);
-    next.set('travelers', String(totalTravelers));
-    next.set('currency', form.currency);
-    if (checkIn) next.set('checkIn', checkIn);
-    if (checkOut) next.set('checkOut', checkOut);
-
-    navigate(`/hospedaje?${next.toString()}`);
   };
 
   const visibleOffers = offers.filter((offer) => {
@@ -499,7 +537,7 @@ export default function SearchPage() {
         </div>
       )}
 
-      {isAuthenticated && trips.length === 0 && (
+      {isAuthenticated && !tripsLoading && trips.length === 0 && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-ambar-100 bg-ambar-50 px-4 py-3">
           <p className="text-sm text-ambar-700">Necesitas crear un viaje antes de agendar vuelos.</p>
           <button
@@ -560,9 +598,7 @@ export default function SearchPage() {
               key={offer.externalId}
               offer={enrichedOffer}
               travelers={totalTravelers}
-              tripId={tripId}
-              sinViajes={isAuthenticated && trips.length === 0}
-              onAdded={onFlightAdded}
+              onSelect={onSelectFlight}
             />
           );
         })}
