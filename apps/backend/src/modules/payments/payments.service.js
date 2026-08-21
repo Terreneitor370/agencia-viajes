@@ -6,6 +6,7 @@ const db = require('../../core/db');
 const ApiError = require('../../core/ApiError');
 const logger = require('../../core/logger');
 const { enviarComprobante } = require('./payments.email');
+const { itemSubtotalCents, DEFAULT_CONTINGENCY_RATE } = require('../budget/budget.engine');
 
 const FRONTEND_URL = env.FRONTEND_URL || 'http://localhost:5173';
 
@@ -28,7 +29,7 @@ async function notificarComprobante(orderId, userId) {
     // las unicas con fecha de reservacion propia (ver payments.email.js).
     const [items, trip] = await Promise.all([
       db.query(
-        `SELECT oi.title, oi.subtotal_cents, oi.quantity, ti.type, ti.meta
+        `SELECT oi.title, oi.unit_price_cents, oi.subtotal_cents, oi.quantity, ti.type, ti.pricing_mode, ti.meta
            FROM order_items oi
            JOIN trip_items ti ON ti.id = oi.trip_item_id
           WHERE oi.order_id = ?`,
@@ -50,23 +51,35 @@ function assertStripeConfigured() {
 }
 
 /**
- * Calcula el total de un viaje a partir de sus trip_items (misma logica que budget.engine.js).
+ * Subtotal de UN renglon (fila cruda de trip_items, snake_case), usando la
+ * MISMA formula de escalado que budget.engine.js -- antes este archivo tenia
+ * su propia copia que solo escalaba per_group (unit * qty) sin importar el
+ * pricingMode. El total de la orden salia bien (el switch de aqui abajo si
+ * escalaba), pero cada order_items.subtotal_cents individual no, asi que en
+ * el comprobante (payments.email.js) la suma de renglones no cuadraba con el
+ * total -- y en Stripe Checkout, cuyo line_items usa este mismo subtotal por
+ * renglon, se le cobraba de menos a la tarjeta en cualquier concepto que no
+ * fuera per_group.
  */
-function computeTotalCents(items, travelers, nights, rooms) {
-  let total = 0;
-  for (const item of items) {
-    const unit = Number(item.unit_price_cents || 0);
-    const qty = Math.max(1, Number(item.quantity || 1));
-    switch (item.pricing_mode) {
-      case 'per_person': total += unit * travelers * qty; break;
-      case 'per_group': total += unit * qty; break;
-      case 'per_night_per_room': total += unit * nights * rooms * qty; break;
-      case 'per_person_per_day': total += unit * travelers * (nights + 1) * qty; break;
-      default: total += unit * qty;
-    }
-  }
-  const contingency = Math.round(total * 0.10);
-  return total + contingency;
+function subtotalDeRenglon(item, tripStats) {
+  return itemSubtotalCents({
+    unitPriceCents: Number(item.unit_price_cents || 0),
+    pricingMode: item.pricing_mode,
+    quantity: item.quantity,
+  }, tripStats);
+}
+
+/**
+ * Aplica subtotalDeRenglon a cada trip_item y calcula subtotal + fondo de
+ * imprevistos + total, todo en centavos. Una sola fuente de verdad: lo mismo
+ * que se guarda en order_items, se cobra en Stripe y se guarda como
+ * orders.total_cents sale de aqui, asi no se pueden desincronizar.
+ */
+function computeOrderTotals(items, tripStats) {
+  const withSubtotal = items.map((item) => ({ ...item, subtotalCents: subtotalDeRenglon(item, tripStats) }));
+  const subtotalCents = withSubtotal.reduce((sum, item) => sum + item.subtotalCents, 0);
+  const contingencyCents = Math.round(subtotalCents * DEFAULT_CONTINGENCY_RATE);
+  return { items: withSubtotal, subtotalCents, contingencyCents, totalCents: subtotalCents + contingencyCents };
 }
 
 function nightsBetween(a, b) {
@@ -94,7 +107,7 @@ async function createCheckoutSession(userId, tripId, currency) {
   const travelers = Number(trip.travelers || 1);
   const nights = nightsBetween(trip.start_date, trip.end_date);
   const rooms = Math.ceil(travelers / 2);
-  const totalCents = computeTotalCents(items, travelers, nights, rooms);
+  const { items: itemsConSubtotal, contingencyCents, totalCents } = computeOrderTotals(items, { travelers, nights, rooms });
 
   const orderId = crypto.randomUUID();
   await db.query(
@@ -103,14 +116,11 @@ async function createCheckoutSession(userId, tripId, currency) {
     [orderId, userId, tripId, totalCents, currency || trip.currency, items.length],
   );
 
-  for (const item of items) {
-    const unitPrice = Number(item.unit_price_cents || 0);
-    const qty = Math.max(1, Number(item.quantity || 1));
-    const subtotal = unitPrice * qty;
+  for (const item of itemsConSubtotal) {
     await db.query(
       `INSERT INTO order_items (id, order_id, trip_item_id, title, unit_price_cents, quantity, subtotal_cents)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [crypto.randomUUID(), orderId, item.id, item.title, unitPrice, qty, subtotal],
+      [crypto.randomUUID(), orderId, item.id, item.title, Number(item.unit_price_cents || 0), Math.max(1, Number(item.quantity || 1)), item.subtotalCents],
     );
   }
 
@@ -122,14 +132,31 @@ async function createCheckoutSession(userId, tripId, currency) {
     billing_address_collection: 'auto',
     customer_creation: 'if_required',
     phone_number_collection: { enabled: false },
-    line_items: items.map((item) => ({
-      price_data: {
-        currency: stripeCurrency,
-        product_data: { name: item.title },
-        unit_amount: Number(item.unit_price_cents || 0),
-      },
-      quantity: Math.max(1, Number(item.quantity || 1)),
-    })),
+    // unit_amount es el subtotal YA escalado por pricing_mode, no el precio
+    // unitario crudo -- Stripe no sabe de viajeros/noches/habitaciones. Por
+    // eso quantity siempre es 1 aqui: la cantidad del concepto (item.quantity)
+    // ya quedo multiplicada dentro de ese subtotal, ponerla tambien en
+    // quantity la cobraria dos veces. El fondo de imprevistos va como un
+    // renglon aparte para que lo que Stripe cobra sume exactamente totalCents
+    // (lo mismo que se guarda en orders.total_cents).
+    line_items: [
+      ...itemsConSubtotal.map((item) => ({
+        price_data: {
+          currency: stripeCurrency,
+          product_data: { name: item.title },
+          unit_amount: item.subtotalCents,
+        },
+        quantity: 1,
+      })),
+      ...(contingencyCents > 0 ? [{
+        price_data: {
+          currency: stripeCurrency,
+          product_data: { name: 'Fondo de imprevistos (10%)' },
+          unit_amount: contingencyCents,
+        },
+        quantity: 1,
+      }] : []),
+    ],
     metadata: { orderId, tripId, userId },
     success_url: `${FRONTEND_URL}/checkout/exito?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${FRONTEND_URL}/viajes/${tripId}`,
@@ -184,6 +211,28 @@ async function handleWebhook(rawBody, signature) {
     }
   }
 
+  // Simetrico al bloque de arriba, pero para el flujo de createPaymentIntent
+  // (Stripe Elements embebido): esas ordenes nunca disparan
+  // checkout.session.completed porque no pasan por Checkout, solo por
+  // PaymentIntents directo. Sin este bloque, si el confirmOrder explicito del
+  // frontend fallaba (pestaña cerrada, parpadeo de red), la orden se quedaba
+  // en 'pending' para siempre aunque Stripe ya hubiera cobrado -- este es el
+  // unico camino de recuperacion del lado servidor para ese flujo.
+  if (event.type === 'payment_intent.succeeded') {
+    const paymentIntent = event.data.object;
+    const orderId = paymentIntent.metadata?.orderId;
+    const userId = paymentIntent.metadata?.userId;
+    if (orderId) {
+      const result = await db.query(
+        `UPDATE orders SET status = 'paid', stripe_payment_intent = ?
+         WHERE id = ? AND status = 'pending'`,
+        [paymentIntent.id, orderId],
+      );
+      logger.info('Orden pagada (PaymentIntent)', { orderId, paymentIntentId: paymentIntent.id });
+      if (result.affectedRows > 0 && userId) notificarComprobante(orderId, userId);
+    }
+  }
+
   if (event.type === 'checkout.session.expired' || event.type === 'payment_intent.payment_failed') {
     const session = event.data.object;
     const orderId = session.metadata?.orderId;
@@ -198,6 +247,48 @@ async function handleWebhook(rawBody, signature) {
 }
 
 /**
+ * `orders.stripe_session_id` guarda dos cosas distintas segun de donde vino
+ * el pago: un Checkout Session id (cs_..., de createCheckoutSession) o un
+ * PaymentIntent id (pi_..., de createPaymentIntent). Son dos namespaces
+ * distintos de la API de Stripe -- checkout.sessions.retrieve() no entiende
+ * un id pi_... ni viceversa -- asi que hay que despachar segun el prefijo,
+ * que Stripe garantiza. Sin esto, sincronizar una orden del flujo que no
+ * "esperaba" el codigo fallaba en silencio (atrapado por el catch de quien
+ * llama) y se quedaba pending para siempre.
+ */
+async function consultarPagoEnStripe(stripeRef) {
+  if (stripeRef.startsWith('pi_')) {
+    const pi = await stripe.paymentIntents.retrieve(stripeRef);
+    return { paid: pi.status === 'succeeded', expired: false, paymentIntentId: pi.id };
+  }
+  const session = await stripe.checkout.sessions.retrieve(stripeRef);
+  return { paid: session.payment_status === 'paid', expired: session.status === 'expired', paymentIntentId: session.payment_intent };
+}
+
+/** Sincroniza una orden pending con Stripe. Usado como red de seguridad cuando el webhook no llego o aun no llega. */
+async function sincronizarOrdenConStripe(order, userId) {
+  if (!(order.status === 'pending' && order.stripe_session_id && stripe)) return order;
+  try {
+    const { paid, expired, paymentIntentId } = await consultarPagoEnStripe(order.stripe_session_id);
+    if (paid) {
+      const result = await db.query(
+        "UPDATE orders SET status = 'paid', stripe_payment_intent = ? WHERE id = ? AND status = 'pending'",
+        [paymentIntentId, order.id],
+      );
+      order.status = 'paid';
+      order.stripe_payment_intent = paymentIntentId;
+      if (result.affectedRows > 0) notificarComprobante(order.id, userId);
+    } else if (expired) {
+      await db.query("UPDATE orders SET status = 'failed' WHERE id = ? AND status = 'pending'", [order.id]);
+      order.status = 'failed';
+    }
+  } catch (err) {
+    logger.warn('No se pudo sincronizar estado con Stripe', { orderId: order.id, error: err.message });
+  }
+  return order;
+}
+
+/**
  * Consulta el estado de una orden.
  * Sincroniza con Stripe si la orden sigue pending.
  */
@@ -207,28 +298,7 @@ async function getOrderStatus(orderId, userId) {
     [orderId, userId],
   );
   if (!order) throw ApiError.notFound('Orden no encontrada');
-
-  if (order.status === 'pending' && order.stripe_session_id && stripe) {
-    try {
-      const session = await stripe.checkout.sessions.retrieve(order.stripe_session_id);
-      if (session.payment_status === 'paid') {
-        const result = await db.query(
-          "UPDATE orders SET status = 'paid', stripe_payment_intent = ? WHERE id = ? AND status = 'pending'",
-          [session.payment_intent, order.id],
-        );
-        order.status = 'paid';
-        order.stripe_payment_intent = session.payment_intent;
-        if (result.affectedRows > 0) notificarComprobante(order.id, userId);
-      } else if (session.status === 'expired') {
-        await db.query("UPDATE orders SET status = 'failed' WHERE id = ? AND status = 'pending'", [order.id]);
-        order.status = 'failed';
-      }
-    } catch (err) {
-      logger.warn('No se pudo sincronizar estado con Stripe', { orderId: order.id, error: err.message });
-    }
-  }
-
-  return order;
+  return sincronizarOrdenConStripe(order, userId);
 }
 
 /**
@@ -241,28 +311,7 @@ async function getOrderBySession(sessionId, userId) {
     [sessionId, userId],
   );
   if (!order) throw ApiError.notFound('Orden no encontrada');
-
-  if (order.status === 'pending' && order.stripe_session_id && stripe) {
-    try {
-      const session = await stripe.checkout.sessions.retrieve(order.stripe_session_id);
-      if (session.payment_status === 'paid') {
-        const result = await db.query(
-          "UPDATE orders SET status = 'paid', stripe_payment_intent = ? WHERE id = ? AND status = 'pending'",
-          [session.payment_intent, order.id],
-        );
-        order.status = 'paid';
-        order.stripe_payment_intent = session.payment_intent;
-        if (result.affectedRows > 0) notificarComprobante(order.id, userId);
-      } else if (session.status === 'expired') {
-        await db.query("UPDATE orders SET status = 'failed' WHERE id = ? AND status = 'pending'", [order.id]);
-        order.status = 'failed';
-      }
-    } catch (err) {
-      logger.warn('No se pudo sincronizar estado con Stripe', { orderId: order.id, error: err.message });
-    }
-  }
-
-  return order;
+  return sincronizarOrdenConStripe(order, userId);
 }
 
 /**
@@ -303,7 +352,7 @@ async function createPaymentIntent(userId, tripId, currency) {
   const travelers = Number(trip.travelers || 1);
   const nights = nightsBetween(trip.start_date, trip.end_date);
   const rooms = Math.ceil(travelers / 2);
-  const totalCents = computeTotalCents(items, travelers, nights, rooms);
+  const { items: itemsConSubtotal, totalCents } = computeOrderTotals(items, { travelers, nights, rooms });
   if (totalCents <= 0) throw ApiError.badRequest('El total del viaje es $0');
 
   const orderId = crypto.randomUUID();
@@ -313,14 +362,11 @@ async function createPaymentIntent(userId, tripId, currency) {
     [orderId, userId, tripId, totalCents, currency || trip.currency, items.length],
   );
 
-  for (const item of items) {
-    const unitPrice = Number(item.unit_price_cents || 0);
-    const qty = Math.max(1, Number(item.quantity || 1));
-    const subtotal = unitPrice * qty;
+  for (const item of itemsConSubtotal) {
     await db.query(
       `INSERT INTO order_items (id, order_id, trip_item_id, title, unit_price_cents, quantity, subtotal_cents)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [crypto.randomUUID(), orderId, item.id, item.title, unitPrice, qty, subtotal],
+      [crypto.randomUUID(), orderId, item.id, item.title, Number(item.unit_price_cents || 0), Math.max(1, Number(item.quantity || 1)), item.subtotalCents],
     );
   }
 
@@ -355,27 +401,7 @@ async function confirmOrder(orderId, userId) {
     [orderId, userId],
   );
   if (!order) throw ApiError.notFound('Orden no encontrada');
-
-  if (order.status === 'paid') return order;
-
-  if (order.stripe_session_id && stripe) {
-    try {
-      const pi = await stripe.paymentIntents.retrieve(order.stripe_session_id);
-      if (pi.status === 'succeeded') {
-        const result = await db.query(
-          "UPDATE orders SET status = 'paid', stripe_payment_intent = ? WHERE id = ? AND status = 'pending'",
-          [pi.id, order.id],
-        );
-        order.status = 'paid';
-        order.stripe_payment_intent = pi.id;
-        if (result.affectedRows > 0) notificarComprobante(order.id, userId);
-      }
-    } catch (err) {
-      logger.warn('No se pudo confirmar orden con Stripe', { orderId: order.id, error: err.message });
-    }
-  }
-
-  return order;
+  return sincronizarOrdenConStripe(order, userId);
 }
 
 module.exports = { createCheckoutSession, createPaymentIntent, confirmOrder, handleWebhook, getOrderStatus, getOrderBySession, listOrders };

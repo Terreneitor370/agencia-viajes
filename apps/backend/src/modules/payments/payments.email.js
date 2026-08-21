@@ -78,9 +78,32 @@ function construirItinerario(trip, items) {
   return buckets.filter((bucket) => bucket.items.length > 0);
 }
 
+// Etiqueta de la unidad que agranda el precio unitario hasta llegar al
+// subtotal del renglon (ver pricing_mode en budget.engine.js). per_group no
+// tiene etiqueta: ahi el unitario y el subtotal ya son el mismo numero
+// (salvo por quantity), no hay nada que aclarar.
+const ETIQUETA_MODO = {
+  per_person: 'persona',
+  per_night_per_room: 'noche/habitacion',
+  per_person_per_day: 'persona/dia',
+};
+
+/**
+ * Precio unitario + subtotal, no solo el subtotal: sin el unitario a la
+ * vista, sumar los renglones a mano (como hizo Kassie al revisar el
+ * comprobante) no deja ver POR QUE el subtotal de un vuelo per_person es
+ * distinto de su precio unitario -- ahi vive el factor de viajeros/noches
+ * que antes faltaba en el calculo (ver subtotalDeRenglon en payments.service.js).
+ * Solo se muestra cuando aporta algo: si coinciden (per_group con quantity 1,
+ * por ejemplo) mostrar el mismo numero dos veces es ruido.
+ */
 function filaConcepto(item, currency) {
+  const etiqueta = ETIQUETA_MODO[item.pricing_mode];
+  const detalle = etiqueta && item.unit_price_cents !== item.subtotal_cents
+    ? `<br><span style="font-size:12px;color:#5A6478;">${dinero(item.unit_price_cents, currency)} por ${etiqueta}</span>`
+    : '';
   return `<tr>
-    <td style="padding:8px 0;font-size:14px;color:#10192B;border-bottom:1px solid #EEF1F5;">${item.title} ${item.quantity > 1 ? `x${item.quantity}` : ''}</td>
+    <td style="padding:8px 0;font-size:14px;color:#10192B;border-bottom:1px solid #EEF1F5;">${item.title} ${item.quantity > 1 ? `x${item.quantity}` : ''}${detalle}</td>
     <td align="right" style="padding:8px 0;font-size:14px;color:#10192B;border-bottom:1px solid #EEF1F5;white-space:nowrap;">${dinero(item.subtotal_cents, currency)}</td>
   </tr>`;
 }
@@ -163,7 +186,13 @@ async function enviarComprobante(destinatario, order, items, trip = null) {
     to: destinatario,
     subject: `Comprobante de tu pago en Viaja · ${dinero(order.total_cents, order.currency)}`,
     text: `Pago confirmado.\n\nTotal: ${dinero(order.total_cents, order.currency)}\nOrden: ${order.id}\n${textoItinerario}\n`
-      + items.map((item) => `- ${item.title}: ${dinero(item.subtotal_cents, order.currency)}`).join('\n'),
+      + items.map((item) => {
+        const etiqueta = ETIQUETA_MODO[item.pricing_mode];
+        const unitario = etiqueta && item.unit_price_cents !== item.subtotal_cents
+          ? ` (${dinero(item.unit_price_cents, order.currency)} por ${etiqueta})`
+          : '';
+        return `- ${item.title}${unitario}: ${dinero(item.subtotal_cents, order.currency)}`;
+      }).join('\n'),
     html: plantillaComprobante({ order, items, itinerario }),
   };
 
