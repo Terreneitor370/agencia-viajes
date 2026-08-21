@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../../core/api/client';
 import Boton from '../../components/ui/Boton';
+import { useAuth } from '../../core/auth/useAuth';
 import { construirPayload, guardarPendiente } from './pendingTripItem';
 
 const toDate = (value) => (value ? String(value).slice(0, 10) : '');
@@ -32,6 +33,7 @@ function tripPatchFromFlight(item) {
 }
 
 export default function AddToTripButton({ item, type, tripId = '', onAdded }) {
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [loading, setLoading] = useState(false);
@@ -101,26 +103,28 @@ export default function AddToTripButton({ item, type, tripId = '', onAdded }) {
   };
 
   const handleAdd = async () => {
+    // Se usa el mismo isAuthenticated de AuthProvider que ya lee el resto de
+    // la app (nav, el selector de viaje de esta misma pagina), en vez de
+    // preguntarle a /auth/me por su cuenta: hacerlo aparte podia desacordar
+    // con esos otros dos mientras AuthProvider todavia resolvia su propio
+    // chequeo inicial (mas notorio en conexiones lentas) -- el boton
+    // aceptaba el clic, decia "ya hay sesion" el solo, pero el panel de
+    // arriba (que si esperaba a AuthProvider) nunca habia llegado a
+    // mostrarse ni a cargar el viaje seleccionado.
+    if (!isAuthenticated) {
+      irALoginYRecordar();
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setSuccess(false);
 
     try {
-      let autenticado = true;
-      try {
-        await api.get('/auth/me');
-      } catch (authErr) {
-        if (authErr.status === 401) autenticado = false;
-        else throw authErr;
-      }
-
-      if (!autenticado) {
-        irALoginYRecordar();
-        return;
-      }
-
       await agregar();
     } catch (err) {
+      // Red de seguridad: si la sesion expiro justo entre el chequeo de
+      // arriba y este POST, igual se manda a login en vez de mostrar error.
       if (err.status === 401) {
         irALoginYRecordar();
         return;
@@ -146,7 +150,7 @@ export default function AddToTripButton({ item, type, tripId = '', onAdded }) {
         tamano="sm"
         cargando={loading}
         onClick={handleAdd}
-        disabled={loading}
+        disabled={loading || authLoading}
         className="border-ambar-400 text-ambar-900 hover:bg-ambar-50"
       >
         {loading ? 'Agregando...' : 'Agregar al viaje'}
