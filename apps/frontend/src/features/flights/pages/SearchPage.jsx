@@ -10,6 +10,7 @@ import FlightCard from '../components/FlightCard';
 import Hero from '../../shared/Hero';
 import PopularOptions from '../../shared/PopularOptions';
 import { tripsApi } from '../../trips/api';
+import { guardarBusqueda, leerBusqueda } from '../../shared/searchSessionMemory';
 
 const HERO_IMAGE = 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=1600&q=60';
 
@@ -83,12 +84,19 @@ export default function SearchPage() {
     currency: searchParams.get('currency') || 'MXN',
   }), [searchParams]);
 
-  const [form, setForm] = useState(() => initialForm(seed));
-  const [offers, setOffers] = useState([]);
+  // Si no viene de un deep-link (flow=create/replace, que trae su propio
+  // criterio) y hay una busqueda guardada de antes de un redirect a login,
+  // se recupera esa en vez de arrancar en blanco -- ver searchSessionMemory.
+  const memoriaGuardada = !flowEnabled && !replaceFlightFlow ? leerBusqueda('flights') : null;
+
+  const [form, setForm] = useState(() => (memoriaGuardada ? memoriaGuardada.form : initialForm(seed)));
+  const [offers, setOffers] = useState(() => memoriaGuardada?.offers || []);
   const [airports, setAirports] = useState([]);
   const [trips, setTrips] = useState([]);
   const [tripId, setTripId] = useState(flowTripId);
-  const [state, setState] = useState({ busy: false, error: '', degraded: false, searched: false });
+  const [state, setState] = useState(() => (memoriaGuardada
+    ? { busy: false, error: '', degraded: memoriaGuardada.degraded || false, searched: true }
+    : { busy: false, error: '', degraded: false, searched: false }));
 
   useEffect(() => {
     let mounted = true;
@@ -188,6 +196,7 @@ export default function SearchPage() {
       const res = await flightsApi.search(payload);
       setOffers(res.data);
       setState({ busy: false, error: '', degraded: Boolean(res.degraded), searched: true });
+      guardarBusqueda('flights', { form, offers: res.data, degraded: Boolean(res.degraded) });
     } catch (err) {
       setOffers([]);
       setState({ busy: false, error: err.message, degraded: false, searched: true });

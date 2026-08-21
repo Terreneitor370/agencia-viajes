@@ -1,6 +1,6 @@
 /** DUENO: Jeshua (modulo C). */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import Boton from '../../../components/ui/Boton';
 import Campo from '../../../components/ui/Campo';
 import Distintivo, { PrecioEstimado } from '../../../components/ui/Distintivo';
@@ -9,6 +9,7 @@ import { useAuth } from '../../../core/auth/useAuth';
 import { dinero } from '../../../core/utils/formato';
 import { tripsApi } from '../../trips/api';
 import { experiencesApi } from '../api';
+import { guardarBusqueda, leerBusqueda } from '../../shared/searchSessionMemory';
 
 const INTERESES = [
   { value: 'cultura', label: 'Cultura' },
@@ -76,20 +77,26 @@ const dayIndexForDate = (isoDate, startDate, endDate) => {
 export default function ExperiencesPage() {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const routerLocation = useLocation();
   const [searchParams] = useSearchParams();
 
   const flowTripId = searchParams.get('tripId') || '';
   const flowEnabled = searchParams.get('flow') === 'create' && Boolean(flowTripId);
   const seededCity = searchParams.get('city') || 'Oaxaca';
 
-  const [city, setCity] = useState(seededCity);
-  const [radiusKm, setRadiusKm] = useState(10);
-  const [limit, setLimit] = useState(9);
-  const [interests, setInterests] = useState(['cultura', 'gastronomia']);
+  // Si no viene de un deep-link (flow=create, que trae su propia ciudad) y
+  // hay una busqueda guardada de antes de un redirect a login, se recupera
+  // esa en vez de arrancar en blanco -- ver searchSessionMemory.
+  const memoriaGuardada = !flowEnabled ? leerBusqueda('experiences') : null;
 
-  const [results, setResults] = useState([]);
-  const [location, setLocation] = useState(null);
-  const [searched, setSearched] = useState(false);
+  const [city, setCity] = useState(memoriaGuardada?.form.city || seededCity);
+  const [radiusKm, setRadiusKm] = useState(memoriaGuardada?.form.radiusKm || 10);
+  const [limit, setLimit] = useState(memoriaGuardada?.form.limit || 9);
+  const [interests, setInterests] = useState(memoriaGuardada?.form.interests || ['cultura', 'gastronomia']);
+
+  const [results, setResults] = useState(memoriaGuardada?.results || []);
+  const [location, setLocation] = useState(memoriaGuardada?.location || null);
+  const [searched, setSearched] = useState(Boolean(memoriaGuardada));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -165,8 +172,14 @@ export default function ExperiencesPage() {
         limit: Number(limitValue),
       });
 
+      const experiencias = Array.isArray(res.data) ? res.data.map(normalizeExperience) : [];
       setLocation(res.location || null);
-      setResults(Array.isArray(res.data) ? res.data.map(normalizeExperience) : []);
+      setResults(experiencias);
+      guardarBusqueda('experiences', {
+        form: { city: cityValue, interests: interestsValue, radiusKm: radiusValue, limit: limitValue },
+        results: experiencias,
+        location: res.location || null,
+      });
     } catch (err) {
       setResults([]);
       if (err.status === 404) {
@@ -228,7 +241,7 @@ export default function ExperiencesPage() {
 
   const addToTrip = async (experience, reservationDateValue) => {
     if (!isAuthenticated) {
-      navigate('/login', { state: { from: { pathname: '/experiencias' } } });
+      navigate('/login', { state: { from: routerLocation } });
       return;
     }
 
@@ -477,7 +490,7 @@ export default function ExperiencesPage() {
                     disabled={added || (isAuthenticated && trips.length > 0 && !reservationDateReady)}
                     onClick={() => {
                       if (!isAuthenticated) {
-                        navigate('/login', { state: { from: { pathname: '/experiencias' } } });
+                        navigate('/login', { state: { from: routerLocation } });
                         return;
                       }
                       if (trips.length === 0) {

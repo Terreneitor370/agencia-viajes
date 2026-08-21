@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { staysApi } from '../api';
 import { getRate, convertList } from '../../../core/api/rates';
 
-export function useStays() {
-  const [stays, setStays] = useState([]);
+/** `inicial`, si se pasa, precarga resultados ya buscados antes (ver
+ * searchSessionMemory.js) en vez de arrancar en blanco. */
+export function useStays(inicial = null) {
+  const [stays, setStays] = useState(inicial?.stays || []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [metadata, setMetadata] = useState({});
-  const [searched, setSearched] = useState(false);
+  const [metadata, setMetadata] = useState(inicial?.metadata || {});
+  const [searched, setSearched] = useState(Boolean(inicial));
 
   const search = async (params) => {
     setLoading(true);

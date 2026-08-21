@@ -7,6 +7,7 @@ import StaySearchForm from '../components/StaySearchForm';
 import StayResults from '../components/StayResults';
 import Hero from '../../shared/Hero';
 import PopularOptions from '../../shared/PopularOptions';
+import { guardarBusqueda, leerBusqueda } from '../../shared/searchSessionMemory';
 
 const HERO_IMAGE = 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1600&q=60';
 
@@ -32,12 +33,6 @@ export default function StaysPage() {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { stays, loading, error, metadata, searched, search, changeCurrency } = useStays();
-  const [seedOverrides, setSeedOverrides] = useState({});
-  const [trips, setTrips] = useState([]);
-  const [tripId, setTripId] = useState('');
-  const [actionError, setActionError] = useState('');
-  const selectedCityRef = useRef('');
 
   const flowTripId = searchParams.get('tripId') || '';
   const flowMode = searchParams.get('flow') || '';
@@ -48,6 +43,18 @@ export default function StaysPage() {
   const safeReturnTo = returnToParam.startsWith('/')
     ? returnToParam
     : (flowTripId ? `/viajes/${flowTripId}` : '/viajes');
+
+  // Si no viene de un deep-link (flow=create/replace, que trae su propio
+  // criterio) y hay una busqueda guardada de antes de un redirect a login,
+  // se recupera esa en vez de arrancar en blanco -- ver searchSessionMemory.
+  const memoriaGuardada = !flowEnabled && !replaceStayFlow ? leerBusqueda('stays') : null;
+
+  const { stays, loading, error, metadata, searched, search, changeCurrency } = useStays(memoriaGuardada);
+  const [seedOverrides, setSeedOverrides] = useState(() => memoriaGuardada?.form || {});
+  const [trips, setTrips] = useState([]);
+  const [tripId, setTripId] = useState('');
+  const [actionError, setActionError] = useState('');
+  const selectedCityRef = useRef('');
 
   useEffect(() => {
     let cancelled = false;
@@ -102,7 +109,20 @@ export default function StaysPage() {
 
   const handleSearch = useCallback(async (params) => {
     selectedCityRef.current = params.city || '';
-    return search(params);
+    const response = await search(params);
+    if (response) {
+      guardarBusqueda('stays', {
+        form: params,
+        stays: Array.isArray(response.data) ? response.data : [],
+        metadata: {
+          location: response.location || null,
+          nights: response.nights || null,
+          rooms: response.rooms || null,
+          degraded: response.degraded || false,
+        },
+      });
+    }
+    return response;
   }, [search]);
 
   useEffect(() => {
