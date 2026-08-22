@@ -103,3 +103,59 @@ export function construirPayload(item, type) {
     ...extras,
   };
 }
+
+/**
+ * Un trip_item aparte por cada asiento con costo (price > 0) de item.seats,
+ * asi cada viajero paga exactamente lo que eligio en vez de repartir un
+ * promedio entre todos. type:'other' + pricingMode:'per_group' ya existian
+ * en el contrato entre modulos (trips.schema.js) -- no hizo falta tocarlo.
+ * item.seats.outbound/return ya vienen con el precio convertido a la moneda
+ * del vuelo (ver buildFlightOffer en SeatSelectionPage.jsx), asi que esta
+ * funcion no necesita saber nada de tasas de cambio. Compartida entre
+ * SeatSelectionPage.jsx (flujo normal) y PendingTripItemResolver.jsx (cuando
+ * la seleccion de asientos se retoma justo despues de iniciar sesion).
+ */
+export function construirCargosDeAsientos(item) {
+  const conCosto = [
+    ...(item.seats?.outbound || []).map((s) => ({ ...s, tramo: s.tramo || 'ida' })),
+    ...(item.seats?.return || []).map((s) => ({ ...s, tramo: s.tramo || 'regreso' })),
+  ].filter((s) => Number(s.price) > 0);
+
+  return conCosto.map((s) => ({
+    type: 'other',
+    provider: item.provider || 'unknown',
+    externalId: item.externalId || null,
+    title: `Asiento ${s.designator} (${s.tramo}) · ${item.origin} → ${item.destination}`,
+    unitPriceCents: Math.round(Number(s.price) * 100),
+    currency: s.currency || item.price?.currency || 'MXN',
+    pricingMode: 'per_group',
+    quantity: 1,
+    estimated: false,
+    meta: { flightOfferId: item.externalId || null, designator: s.designator, tramo: s.tramo },
+  }));
+}
+
+/**
+ * URL del paso 3 (hospedaje) tras guardar un vuelo: arrastra los mismos
+ * criterios de busqueda (ciudad/fechas/viajeros/moneda) y, si aplica, los
+ * asientos elegidos. searchParams puede venir de la barra de direcciones
+ * (SeatSelectionPage.jsx) o de un continueUrl guardado como pendiente
+ * (PendingTripItemResolver.jsx) -- misma forma en los dos casos, por eso se
+ * comparte en vez de duplicarla.
+ */
+export function buildStaysUrl(searchParams, seats, tripId) {
+  const next = new URLSearchParams();
+  if (tripId) next.set('tripId', tripId);
+  next.set('flow', searchParams.get('flow') || 'create');
+  const city = searchParams.get('city');
+  if (city) next.set('city', city);
+  next.set('travelers', searchParams.get('travelers') || '1');
+  next.set('currency', searchParams.get('currency') || 'MXN');
+  const checkIn = searchParams.get('checkIn');
+  const checkOut = searchParams.get('checkOut');
+  if (checkIn) next.set('checkIn', checkIn);
+  if (checkOut) next.set('checkOut', checkOut);
+  if (seats?.outbound?.length) next.set('seatsOut', seats.outbound.map((s) => s.designator).join(','));
+  if (seats?.return?.length) next.set('seatsRet', seats.return.map((s) => s.designator).join(','));
+  return `/hospedaje?${next.toString()}`;
+}

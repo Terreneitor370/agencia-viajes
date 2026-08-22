@@ -2,11 +2,23 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../core/api/client';
 import { useAuth } from '../../core/auth/useAuth';
-import { construirPayload, leerPendiente, limpiarPendiente } from './pendingTripItem';
+import { buildStaysUrl, construirCargosDeAsientos, construirPayload, leerPendiente, limpiarPendiente } from './pendingTripItem';
 
 const NOMBRE_TIPO = { flight: 'vuelo', stay: 'hospedaje' };
 
 const toDate = (value) => (value ? String(value).slice(0, 10) : '');
+
+/** Entre los viajes editables del usuario, el que se tenia en mente al guardar el pendiente si sigue siendo valido, si no el primero disponible. */
+async function resolverTripDestino(pendienteTripId) {
+  const tripsRes = await api.get('/trips');
+  const trips = tripsRes.data || [];
+  const editableTrips = trips.filter((trip) => !(trip.is_paid ?? trip.isPaid));
+  if (editableTrips.length === 0) {
+    throw new Error('SIN_VIAJES_EDITABLES');
+  }
+  const allowedIds = new Set(editableTrips.map((trip) => trip.id));
+  return pendienteTripId && allowedIds.has(pendienteTripId) ? pendienteTripId : editableTrips[0].id;
+}
 
 function tripPatchFromFlight(item) {
   const patch = {};
@@ -56,24 +68,44 @@ export default function PendingTripItemResolver() {
 
     (async () => {
       try {
+        // Vuelo cuya seleccion de asientos (SeatSelectionPage.jsx) se
+        // interrumpio para hacer login: antes esto mandaba de vuelta a
+        // /asientos con los mismos parametros de busqueda de siempre, sin la
+        // seleccion ya hecha -- Isa lo reporto como una regresion de UX real
+        // (el usuario terminaba llenando el paso 2 dos veces). Como el
+        // pendiente ya trae los asientos elegidos (item.seats, con el precio
+        // ya convertido a la moneda del vuelo), se puede guardar directo y
+        // seguir al paso 3 sin volver a mostrar el mapa de asientos.
+        if (pendiente.continueUrl && pendiente.type === 'flight' && pendiente.item?.seats) {
+          const targetTripId = await resolverTripDestino(pendiente.tripId);
+          await api.post(`/trips/${targetTripId}/items`, construirPayload(pendiente.item, 'flight'));
+          for (const chargeItem of construirCargosDeAsientos(pendiente.item)) {
+            await api.post(`/trips/${targetTripId}/items`, chargeItem);
+          }
+
+          const patch = tripPatchFromFlight(pendiente.item);
+          if (Object.keys(patch).length > 0) {
+            try {
+              await api.patch(`/trips/${targetTripId}`, patch);
+            } catch {
+              // El vuelo ya se guardo; solo se omite la sincronizacion de fechas/ciudad.
+            }
+          }
+
+          const continueParams = new URL(pendiente.continueUrl, window.location.origin).searchParams;
+          navigate(buildStaysUrl(continueParams, pendiente.item.seats, targetTripId));
+          return;
+        }
+
+        // Cualquier otro pendiente con continueUrl (hoy solo pasa con vuelos
+        // sin asientos elegidos, ej. aerolinea sin mapa disponible): no hay
+        // nada que restaurar, se manda de vuelta tal como antes.
         if (pendiente.continueUrl) {
           navigate(pendiente.continueUrl);
           return;
         }
 
-        const tripsRes = await api.get('/trips');
-        const trips = tripsRes.data || [];
-        const editableTrips = trips.filter((trip) => !(trip.is_paid ?? trip.isPaid));
-        if (editableTrips.length === 0) {
-          setAviso({ tipo: 'error', texto: 'No tienes viajes editables. Los viajes pagados no aceptan cambios.' });
-          return;
-        }
-
-        const allowedIds = new Set(editableTrips.map((trip) => trip.id));
-        const targetTripId = pendiente.tripId && allowedIds.has(pendiente.tripId)
-          ? pendiente.tripId
-          : editableTrips[0].id;
-
+        const targetTripId = await resolverTripDestino(pendiente.tripId);
         const payload = construirPayload(pendiente.item, pendiente.type);
         await api.post(`/trips/${targetTripId}/items`, payload);
 
@@ -90,8 +122,11 @@ export default function PendingTripItemResolver() {
 
         const nombre = NOMBRE_TIPO[pendiente.type] || 'elemento';
         setAviso({ tipo: 'exito', texto: `Se agrego el ${nombre} que buscabas a tu viaje.` });
-      } catch {
-        setAviso({ tipo: 'error', texto: 'Iniciaste sesion, pero no se pudo agregar lo que buscabas. Intenta de nuevo desde la busqueda.' });
+      } catch (err) {
+        const texto = err?.message === 'SIN_VIAJES_EDITABLES'
+          ? 'No tienes viajes editables. Los viajes pagados no aceptan cambios.'
+          : 'Iniciaste sesion, pero no se pudo agregar lo que buscabas. Intenta de nuevo desde la busqueda.';
+        setAviso({ tipo: 'error', texto });
       }
     })();
   }, [isAuthenticated]);

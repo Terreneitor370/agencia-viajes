@@ -4,7 +4,7 @@ import MapaAsientos from '../components/MapaAsientos';
 import { flightsApi } from '../api';
 import { api } from '../../../core/api/client';
 import { useAuth } from '../../../core/auth/useAuth';
-import { construirPayload, guardarPendiente } from '../../shared/pendingTripItem';
+import { buildStaysUrl, construirCargosDeAsientos, construirPayload, guardarPendiente } from '../../shared/pendingTripItem';
 
 const time = (iso) =>
   iso ? new Date(iso).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : '--';
@@ -17,10 +17,7 @@ export default function SeatSelectionPage() {
   const tripId = params.get('tripId') || '';
   const travelers = Number(params.get('travelers')) || 1;
   const currency = params.get('currency') || 'MXN';
-  const city = params.get('city') || '';
   const flow = params.get('flow') || '';
-  const checkIn = params.get('checkIn') || '';
-  const checkOut = params.get('checkOut') || '';
   const offerId = params.get('offerId') || '';
   const origin = params.get('origin') || '';
   const destination = params.get('destination') || '';
@@ -71,69 +68,49 @@ export default function SeatSelectionPage() {
     navigate(`/buscar${backParams ? `?${backParams}` : ''}`);
   };
 
-  const buildStaysUrl = (tripIdParam) => {
-    const next = new URLSearchParams();
-    if (tripIdParam) next.set('tripId', tripIdParam);
-    next.set('flow', flow || 'create');
-    if (city) next.set('city', city);
-    next.set('travelers', String(travelers));
-    next.set('currency', currency);
-    if (checkIn) next.set('checkIn', checkIn);
-    if (checkOut) next.set('checkOut', checkOut);
-    if (seatOutbound?.length) next.set('seatsOut', seatOutbound.map((s) => s.designator).join(','));
-    if (seatReturn?.length) next.set('seatsRet', seatReturn.map((s) => s.designator).join(','));
-    return `/hospedaje?${next.toString()}`;
-  };
-
   // Comun a ambas ramas de abajo (con sesion y sin sesion): antes cada una
   // armaba su propio objeto por separado y ninguna incluia los asientos
   // elegidos en MapaAsientos.jsx, asi que la seleccion se perdia siempre al
   // guardar el vuelo en el viaje. El vuelo se guarda a su precio base, SIN
-  // el cargo de asientos: ese cargo se cobra aparte (ver buildSeatChargeItems)
-  // porque cada viajero puede haber elegido un asiento de precio distinto, y
-  // pricingMode 'per_person' solo admite un unico precio que se multiplica
-  // por travelers -- no hay forma de que ese precio unico represente montos
+  // el cargo de asientos: ese cargo se cobra aparte (ver
+  // construirCargosDeAsientos en pendingTripItem.js) porque cada viajero
+  // puede haber elegido un asiento de precio distinto, y pricingMode
+  // 'per_person' solo admite un unico precio que se multiplica por
+  // travelers -- no hay forma de que ese precio unico represente montos
   // distintos por persona.
-  const buildFlightOffer = () => ({
-    externalId: offerId,
-    origin,
-    destination,
-    departureAt,
-    airline,
-    price: { amount: Number(params.get('priceAmount')) || 0, currency: params.get('priceCurrency') || 'MXN' },
-    provider: params.get('provider') || 'unknown',
-    pricingMode: 'per_person',
-    return: retOrigin ? { departureAt: retDepartureAt } : null,
-    seats: (seatOutbound || seatReturn) ? { outbound: seatOutbound, return: seatReturn } : null,
-  });
-
-  // Un trip_item aparte por cada asiento con costo (price > 0), asi cada
-  // viajero paga exactamente lo que eligio en vez de repartir un promedio
-  // entre todos. type:'other' + pricingMode:'per_group' ya existian en el
-  // contrato entre modulos (trips.schema.js) -- no hizo falta tocarlo.
+  //
   // seat.price viene en baseCurrency (la moneda que reporta Duffel para los
   // asientos, ver el useEffect de arriba), no necesariamente la misma que
-  // priceCurrency (la del vuelo): se convierte con el mismo currencyRate que
-  // MapaAsientos.jsx ya usa para mostrar "Costo extra: $X" en pantalla.
-  const buildSeatChargeItems = () => {
-    const conCosto = [
-      ...(seatOutbound || []).map((s) => ({ ...s, tramo: 'ida' })),
-      ...(seatReturn || []).map((s) => ({ ...s, tramo: 'regreso' })),
-    ].filter((s) => Number(s.price) > 0);
-
+  // priceCurrency (la del vuelo): se convierte aqui mismo, una sola vez, con
+  // el mismo currencyRate que MapaAsientos.jsx ya usa para mostrar "Costo
+  // extra: $X" en pantalla -- asi todo lo que lee item.seats despues
+  // (construirCargosDeAsientos, el resumen que se muestra en el itinerario,
+  // y PendingTripItemResolver.jsx si el login interrumpe el flujo) encuentra
+  // el precio ya en una sola moneda consistente, sin tener que volver a
+  // convertir con una tasa que ya no tendria de donde sacar.
+  const buildFlightOffer = () => {
     const priceCurrency = params.get('priceCurrency') || 'MXN';
-    return conCosto.map((s) => ({
-      type: 'other',
-      provider: params.get('provider') || 'unknown',
-      externalId: offerId,
-      title: `Asiento ${s.designator} (${s.tramo}) · ${origin} → ${destination}`,
-      unitPriceCents: Math.round(Number(s.price) * currencyRate * 100),
+    const convertir = (seats, tramo) => (seats || []).map((s) => ({
+      designator: s.designator,
+      price: Math.round(Number(s.price) * currencyRate * 100) / 100,
       currency: priceCurrency,
-      pricingMode: 'per_group',
-      quantity: 1,
-      estimated: false,
-      meta: { flightOfferId: offerId, designator: s.designator, tramo: s.tramo },
+      tramo,
     }));
+    const outbound = convertir(seatOutbound, 'ida');
+    const ret = convertir(seatReturn, 'regreso');
+
+    return {
+      externalId: offerId,
+      origin,
+      destination,
+      departureAt,
+      airline,
+      price: { amount: Number(params.get('priceAmount')) || 0, currency: priceCurrency },
+      provider: params.get('provider') || 'unknown',
+      pricingMode: 'per_person',
+      return: retOrigin ? { departureAt: retDepartureAt } : null,
+      seats: (outbound.length || ret.length) ? { outbound, return: ret } : null,
+    };
   };
 
   const addToTripAndGoToStays = async () => {
@@ -148,13 +125,14 @@ export default function SeatSelectionPage() {
     setSaving(true);
     setSaveError('');
     try {
-      await api.post(`/trips/${tripId}/items`, construirPayload(buildFlightOffer(), 'flight'));
+      const offer = buildFlightOffer();
+      await api.post(`/trips/${tripId}/items`, construirPayload(offer, 'flight'));
 
       // Secuencial, no Promise.all: si un asiento falla a mitad de camino
       // preferimos que el error se note claro en vez de que una carga en
       // paralelo deje al usuario sin saber cuales de varios cargos si se
       // guardaron.
-      for (const chargeItem of buildSeatChargeItems()) {
+      for (const chargeItem of construirCargosDeAsientos(offer)) {
         await api.post(`/trips/${tripId}/items`, chargeItem);
       }
 
@@ -168,7 +146,7 @@ export default function SeatSelectionPage() {
         return;
       }
 
-      navigate(buildStaysUrl(tripId));
+      navigate(buildStaysUrl(params, offer.seats, tripId));
     } catch (err) {
       setSaveError(err.message || 'No se pudo guardar el vuelo. Intenta de nuevo.');
     } finally {
