@@ -15,7 +15,7 @@ const tripTitle = z.string().trim().min(3).max(120)
 // cual hasta el usuario porque validate.js reenvia issue.message sin tocarlo.
 const budgetLimitField = z.coerce.number({ invalid_type_error: 'El limite debe ser un numero valido' })
   .min(0, 'El limite no puede ser negativo')
-  .max(10_000_000, 'El limite no puede superar 10,000,000')
+  .max(999_999, 'El limite no puede superar 999,999')
   .nullable();
 
 const createTripSchema = z.object({

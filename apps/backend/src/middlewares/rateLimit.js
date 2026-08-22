@@ -29,8 +29,14 @@ module.exports = {
   globalLimiter: build('global', 15 * 60 * 1000, 300),
   /** Login, registro, recuperacion: 10 intentos / 15 min por IP. */
   authLimiter: build('auth', 15 * 60 * 1000, 10, { skipSuccessfulRequests: true }),
-  /** Endpoints que consumen APIs de terceros: 60 / 15 min por usuario. */
-  externalApiLimiter: build('external', 15 * 60 * 1000, 60, {
+  // Vuelos exige sesion iniciada (ver flights/routes.jsx en el frontend), asi
+  // que casi todo este trafico ya agrupa por user.id y no por IP: una escuela
+  // o casa con NAT compartido ya no agota el balde entre varias personas
+  // anonimas. Buscar vuelos cuesta varias solicitudes (search + check de
+  // mapas de asientos + preload), asi que 60 se sentia bajo para una sesion
+  // de pruebas activa -- se subio a 120.
+  /** Endpoints que consumen APIs de terceros: 120 / 15 min por usuario. */
+  externalApiLimiter: build('external', 15 * 60 * 1000, 120, {
     keyGenerator: (req) => req.user?.id || req.ip,
   }),
   /** Escrituras: 100 / 15 min. */

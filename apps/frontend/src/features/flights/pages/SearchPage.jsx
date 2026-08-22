@@ -244,7 +244,11 @@ export default function SearchPage() {
       }
       setOffers(offers);
       if (offers.length > 0) setBaseCurrency(offers[0].price.currency);
-      offers.slice(0, 5).forEach((o) => flightsApi.preloadSeatMap(o.externalId));
+      // Solo las primeras 3 (antes 5): cada precarga es una solicitud aparte
+      // contra el limite de tasa de externalApiLimiter, y esto es puro
+      // adelanto para que /asientos cargue instantaneo -- no bloquea nada si
+      // el usuario elige una oferta que no se precargo.
+      offers.slice(0, 3).forEach((o) => flightsApi.preloadSeatMap(o.externalId));
       setState({ busy: false, error: '', degraded: Boolean(res.degraded), searched: true });
       guardarBusqueda('flights', { form, offers, degraded: Boolean(res.degraded) });
     } catch (err) {

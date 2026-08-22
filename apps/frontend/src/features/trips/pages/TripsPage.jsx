@@ -308,6 +308,14 @@ export default function TripsPage() {
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
   };
 
+  // Solo digitos y maximo 6 cifras (999,999): filtra al teclear y al pegar,
+  // no solo al enviar. maxLength en el input es un respaldo, no basta solo
+  // (no bloquea letras ni pegar texto con formato).
+  const onBudgetLimitChange = (event) => {
+    const digitsOnly = event.target.value.replace(/\D/g, '').slice(0, 6);
+    setForm((prev) => ({ ...prev, budgetLimit: digitsOnly }));
+  };
+
   const onCreate = async (event) => {
     event.preventDefault();
     setCreating(true);
@@ -319,7 +327,7 @@ export default function TripsPage() {
       return;
     }
 
-    const sanitized = form.budgetLimit.trim().replace(/[\s,$]/g, '');
+    const sanitized = form.budgetLimit.trim().replace(/\D/g, '');
     const budgetLimit = sanitized ? Number(sanitized) : null;
 
     if (sanitized && (!Number.isFinite(budgetLimit) || budgetLimit < 0)) {
@@ -328,8 +336,8 @@ export default function TripsPage() {
       return;
     }
 
-    if (budgetLimit != null && budgetLimit > 10_000_000) {
-      setCreateError('El limite no puede superar 10,000,000.');
+    if (budgetLimit != null && budgetLimit > 999_999) {
+      setCreateError('El limite no puede superar 999,999.');
       setCreating(false);
       return;
     }
@@ -463,9 +471,11 @@ export default function TripsPage() {
             <Campo
               etiqueta="Limite para gastar (opcional)"
               ayuda="MXN"
-              inputMode="decimal"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={6}
               value={form.budgetLimit}
-              onChange={onForm('budgetLimit')}
+              onChange={onBudgetLimitChange}
               placeholder="65000"
             />
 
