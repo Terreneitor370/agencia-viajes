@@ -68,9 +68,9 @@ function normalize(offer, travelers = 1) {
   // Obtener la hora de salida del tramo de ida
   const departureTime = segments[0]?.departing_at;
 
-  // 🔧 FILTRO: Si el vuelo ya salió, lo marcamos como no disponible
+  // Si el vuelo ya salio, lo marcamos como no disponible
   if (departureTime && new Date(departureTime) < new Date()) {
-    return null; // ← Este vuelo se descartará
+    return null; // Este vuelo se descartara
   }
 
   // Duffel total_amount es el TOTAL del grupo; el contrato interno pide POR
@@ -208,7 +208,7 @@ async function searchOffers({ origin, destination, departureDate, returnDate, ad
     timeoutMs: 12000, // la busqueda de vuelos es lenta por naturaleza
   });
 
-  // 🔧 CORREGIDO: Normalizar y filtrar vuelos que ya salieron
+  // Normalizar y filtrar vuelos que ya salieron
   const offers = raw.data.offers
     .map((offer) => normalize(offer, total)) // Normalizar cada oferta
     .filter(offer => offer !== null); // Eliminar los que ya salieron

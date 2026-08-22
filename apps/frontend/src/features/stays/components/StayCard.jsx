@@ -1,3 +1,4 @@
+import { Star } from 'lucide-react';
 import AddToTripButton from '../../shared/AddToTripButton';
 import { useStayImage } from '../hooks/useStayImage';
 
@@ -80,9 +81,14 @@ export default function StayCard({ stay, nights, tripId = '', sinViajes = false,
         </div>
 
         {stay.stars && (
-          <p className="mt-1 text-sm text-ambar-700" aria-label={`${stay.stars} estrellas`}>
-            {'★'.repeat(stay.stars)}
-            <span className="text-sm text-bordeFuerte">{'★'.repeat(Math.max(0, 5 - stay.stars))}</span>
+          <p className="mt-1 flex items-center gap-0.5" aria-label={`${stay.stars} estrellas`}>
+            {Array.from({ length: 5 }, (_, i) => (
+              <Star
+                key={i}
+                className={i < stay.stars ? 'h-3.5 w-3.5 fill-ambar-700 text-ambar-700' : 'h-3.5 w-3.5 text-bordeFuerte'}
+                aria-hidden="true"
+              />
+            ))}
           </p>
         )}
 

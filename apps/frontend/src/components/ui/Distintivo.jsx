@@ -2,29 +2,31 @@
  * Distintivos y etiquetas. DUENO: core compartido.
  *
  * Regla de accesibilidad que impone este componente: el color nunca es el
- * unico portador del significado. Cada tono trae ademas un simbolo, para que
+ * unico portador del significado. Cada tono trae ademas un icono, para que
  * alguien con daltonismo o mirando una pantalla mal calibrada siga
- * distinguiendo los cuatro estados.
+ * distinguiendo los cuatro estados. Iconos de lucide-react, no glifos Unicode
+ * ni emojis -- politica del proyecto.
  */
+import { Check, Info, RotateCcw, Star, TriangleAlert } from 'lucide-react';
 
 const TONOS = {
-  info: { clases: 'bg-azul-50 text-azul-700 border-azul-100', simbolo: 'ⓘ' },
-  exito: { clases: 'bg-exitoSuave text-exito border-exito/20', simbolo: '✓' },
-  oferta: { clases: 'bg-ambar-50 text-ambar-700 border-ambar-100', simbolo: '★' },
-  critico: { clases: 'bg-criticoSuave text-critico border-critico/25', simbolo: '▲' },
-  neutro: { clases: 'bg-lienzo text-tinta-700 border-borde', simbolo: '' },
-  respaldo: { clases: 'bg-lienzo text-tinta-700 border-bordeFuerte border-dashed', simbolo: '↺' },
+  info: { clases: 'bg-azul-50 text-azul-700 border-azul-100', Icono: Info },
+  exito: { clases: 'bg-exitoSuave text-exito border-exito/20', Icono: Check },
+  oferta: { clases: 'bg-ambar-50 text-ambar-700 border-ambar-100', Icono: Star },
+  critico: { clases: 'bg-criticoSuave text-critico border-critico/25', Icono: TriangleAlert },
+  neutro: { clases: 'bg-lienzo text-tinta-700 border-borde', Icono: null },
+  respaldo: { clases: 'bg-lienzo text-tinta-700 border-bordeFuerte border-dashed', Icono: RotateCcw },
 };
 
-export default function Distintivo({ tono = 'neutro', simbolo, children, className = '' }) {
+export default function Distintivo({ tono = 'neutro', simbolo: Simbolo, children, className = '' }) {
   const t = TONOS[tono] ?? TONOS.neutro;
-  const glifo = simbolo ?? t.simbolo;
+  const Icono = Simbolo ?? t.Icono;
 
   return (
     <span
       className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] font-semibold leading-tight ${t.clases} ${className}`}
     >
-      {glifo && <span aria-hidden="true">{glifo}</span>}
+      {Icono && <Icono className="h-3 w-3 shrink-0" aria-hidden="true" />}
       {children}
     </span>
   );

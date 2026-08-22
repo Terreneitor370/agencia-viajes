@@ -1,6 +1,7 @@
 /** DUENO: Jeshua (modulo C). */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Check, Compass, Drama, Map, MapPin, Moon, ShoppingBag, Trees, Utensils } from 'lucide-react';
 import Boton from '../../../components/ui/Boton';
 import Campo from '../../../components/ui/Campo';
 import Distintivo, { PrecioEstimado } from '../../../components/ui/Distintivo';
@@ -21,24 +22,27 @@ const INTERESES = [
 ];
 
 // Geoapify no da fotos en el plan gratuito, asi que en vez de dejar la
-// tarjeta vacia se usa un icono por categoria. Las categorias que llegan son
-// las mismas de CATEGORY_MAP en experiences.schema.js (ej. "catering.restaurant",
-// "entertainment.museum") -- el mapeo es por el prefijo antes del punto, no
-// el valor completo, porque Geoapify tiene muchas subcategorias por prefijo.
+// tarjeta vacia se usa un icono por categoria (componentes de lucide-react,
+// no emojis: nada en este proyecto debe llevar emojis). Las categorias que
+// llegan son las mismas de CATEGORY_MAP en experiences.schema.js (ej.
+// "catering.restaurant", "entertainment.museum") -- el mapeo es por el
+// prefijo antes del punto, no el valor completo, porque Geoapify tiene
+// muchas subcategorias por prefijo.
 const ICONO_POR_PREFIJO = {
-  catering: '🍽️',
-  entertainment: '🎭',
-  tourism: '🗺️',
-  natural: '🌳',
-  leisure: '🌳',
-  sport: '🏄',
-  adult: '🌃',
-  commercial: '🛍️',
+  catering: Utensils,
+  entertainment: Drama,
+  tourism: Map,
+  natural: Trees,
+  leisure: Trees,
+  sport: Compass,
+  adult: Moon,
+  commercial: ShoppingBag,
 };
 
-function iconoExperiencia(categories) {
+function IconoExperiencia({ categories, className }) {
   const prefijo = String(categories?.[0] || '').split('.')[0];
-  return ICONO_POR_PREFIJO[prefijo] || '📍';
+  const Icono = ICONO_POR_PREFIJO[prefijo] || MapPin;
+  return <Icono className={className} aria-hidden="true" />;
 }
 
 const normalizeTrip = (trip) => ({
@@ -359,13 +363,13 @@ export default function ExperiencesPage() {
                 key={interest.value}
                 type="button"
                 onClick={() => toggleInterest(interest.value)}
-                className={`rounded-md border px-3 py-1.5 text-menor font-semibold transition ${
+                className={`inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-menor font-semibold transition ${
                   active
                     ? 'border-azul-600 bg-azul-600 text-white'
                     : 'border-bordeInteractivo bg-superficie text-tinta-700 hover:bg-lienzo'
                 }`}
               >
-                {active ? '✓ ' : ''}
+                {active && <Check className="h-3.5 w-3.5" aria-hidden="true" />}
                 {interest.label}
               </button>
             );
@@ -482,8 +486,8 @@ export default function ExperiencesPage() {
 
           return (
             <Tarjeta key={experience.id} className="overflow-hidden">
-              <div className="grid h-28 place-items-center border-b border-borde bg-lienzo text-4xl" aria-hidden="true">
-                {iconoExperiencia(experience.categories)}
+              <div className="grid h-28 place-items-center border-b border-borde bg-lienzo">
+                <IconoExperiencia categories={experience.categories} className="h-10 w-10 text-tinta-400" />
               </div>
 
               <div className="p-4">

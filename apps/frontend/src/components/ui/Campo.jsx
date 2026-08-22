@@ -12,13 +12,14 @@
  *    frustra.
  */
 import { useId } from 'react';
+import { TriangleAlert } from 'lucide-react';
 
 export default function Campo({
   etiqueta,
   ayuda,
   error,
   sufijo,        // por ejemplo el distintivo IATA dentro del campo
-  contador,      // por ejemplo "12 de 12 ✓"
+  contador,      // por ejemplo "12 de 12"
   className = '',
   inputClassName = '',
   ...props
@@ -59,7 +60,7 @@ export default function Campo({
 
       {error && (
         <p id={idError} role="alert" className="mt-1 flex items-start gap-1 text-menor text-critico">
-          <span aria-hidden="true">▲</span>
+          <TriangleAlert className="h-3.5 w-3.5 shrink-0 translate-y-0.5" aria-hidden="true" />
           <span>{error}</span>
         </p>
       )}

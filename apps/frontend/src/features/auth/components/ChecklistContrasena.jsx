@@ -8,12 +8,14 @@
  * de contrasenas comunes. Un checklist mas largo prometeria una regla que el
  * backend no aplica.
  */
+import { Check, Circle } from 'lucide-react';
 import { LONGITUD_MINIMA_CONTRASENA } from '../utils/contrasena';
 
 function Item({ cumple, children }) {
+  const Icono = cumple ? Check : Circle;
   return (
     <li className={`flex items-center gap-1.5 ${cumple ? 'text-exito' : 'text-tinta-500'}`}>
-      <span aria-hidden="true">{cumple ? '✓' : '○'}</span>
+      <Icono className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
       {children}
     </li>
   );

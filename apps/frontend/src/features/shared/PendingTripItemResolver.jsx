@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Check, TriangleAlert, X } from 'lucide-react';
 import { api } from '../../core/api/client';
 import { useAuth } from '../../core/auth/useAuth';
 import { buildStaysUrl, construirCargosDeAsientos, construirPayload, leerPendiente, limpiarPendiente } from './pendingTripItem';
@@ -149,7 +150,9 @@ export default function PendingTripItemResolver() {
       ].join(' ')}
     >
       <div className="flex items-start gap-2">
-        <span aria-hidden="true">{esExito ? '✓' : '!'}</span>
+        {esExito
+          ? <Check className="h-4 w-4 shrink-0 translate-y-0.5" aria-hidden="true" />
+          : <TriangleAlert className="h-4 w-4 shrink-0 translate-y-0.5" aria-hidden="true" />}
         <p className="flex-1">{aviso.texto}</p>
         <button
           type="button"
@@ -157,7 +160,7 @@ export default function PendingTripItemResolver() {
           className="text-tinta-400 hover:text-tinta-600"
           aria-label="Cerrar aviso"
         >
-          ✕
+          <X className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
     </div>

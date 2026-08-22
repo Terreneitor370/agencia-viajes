@@ -5,6 +5,7 @@
  * llega de la API y envia cambios de viajeros.
  */
 import { useEffect, useMemo, useState } from 'react';
+import { Check, TriangleAlert } from 'lucide-react';
 import Distintivo from '../../../components/ui/Distintivo';
 import { dinero } from '../../../core/utils/formato';
 import { paymentsApi } from '../../payments/api';
@@ -207,20 +208,23 @@ function BudgetContent({
             )}
 
             {budget?.overBudget && (
-              <p className="rounded-md border border-critico/20 bg-criticoSuave px-3 py-2 text-menor text-critico">
-                ▲ {dinero(Math.abs(remaining), currency)} arriba de tu limite.
+              <p className="flex items-start gap-1.5 rounded-md border border-critico/20 bg-criticoSuave px-3 py-2 text-menor text-critico">
+                <TriangleAlert className="h-3.5 w-3.5 shrink-0 translate-y-0.5" aria-hidden="true" />
+                <span>{dinero(Math.abs(remaining), currency)} arriba de tu limite.</span>
               </p>
             )}
 
             {nearLimit && (
-              <p className="rounded-md border border-ambar-100 bg-ambar-50 px-3 py-2 text-menor text-ambar-700">
-                ★ Estas cerca del limite. Revisa hospedaje y conceptos por dia.
+              <p className="flex items-start gap-1.5 rounded-md border border-ambar-100 bg-ambar-50 px-3 py-2 text-menor text-ambar-700">
+                <TriangleAlert className="h-3.5 w-3.5 shrink-0 translate-y-0.5" aria-hidden="true" />
+                <span>Estas cerca del limite. Revisa hospedaje y conceptos por dia.</span>
               </p>
             )}
 
             {!budget?.overBudget && !nearLimit && hasLimit && (
-              <p className="rounded-md border border-exito/20 bg-exitoSuave px-3 py-2 text-menor text-exito">
-                ✓ Te quedan {dinero(Math.max(0, remaining), currency)} antes de alcanzar tu limite.
+              <p className="flex items-start gap-1.5 rounded-md border border-exito/20 bg-exitoSuave px-3 py-2 text-menor text-exito">
+                <Check className="h-3.5 w-3.5 shrink-0 translate-y-0.5" aria-hidden="true" />
+                <span>Te quedan {dinero(Math.max(0, remaining), currency)} antes de alcanzar tu limite.</span>
               </p>
             )}
 

@@ -1,3 +1,5 @@
+import { Info } from 'lucide-react';
+
 const money = (amount, currency) =>
   new Intl.NumberFormat('es-MX', { style: 'currency', currency }).format(amount);
 
@@ -100,8 +102,9 @@ export default function FlightCard({ offer, travelers = 1, onSelect }) {
         )}
 
         {offer.estimated && (
-          <span className="inline-block mt-2 text-xs border border-dashed border-amber-400 px-2 py-0.5 rounded text-amber-600">
-            ⚡ Datos de ejemplo
+          <span className="mt-2 inline-flex items-center gap-1 text-xs border border-dashed border-amber-400 px-2 py-0.5 rounded text-amber-600">
+            <Info className="h-3 w-3" aria-hidden="true" />
+            Datos de ejemplo
           </span>
         )}
       </div>
