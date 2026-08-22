@@ -120,15 +120,15 @@ function ItineraryRow({ item, tripStats, defaultCurrency, showRemove = false, re
     ? `Reservada para ${fechaCorta(item.meta.reservationDate)}`
     : '';
 
-  const seatsExtraCents = Number(item.meta?.seats?.extraChargeCents || 0);
+  // El cargo de los asientos con costo no vive aqui: cada uno se guarda como
+  // su propio concepto tipo "other" (ver buildSeatChargeItems en
+  // SeatSelectionPage.jsx), asi que ya aparece como renglon aparte en el
+  // itinerario con su propio precio exacto -- esto solo dice cual asiento
+  // se eligio, sin repetir el costo.
   const seatsLabel = item.type === 'flight' && item.meta?.seats
     ? [
         item.meta.seats.outbound?.length ? `Asiento ida ${item.meta.seats.outbound.map((s) => s.designator).join(', ')}` : '',
         item.meta.seats.return?.length ? `regreso ${item.meta.seats.return.map((s) => s.designator).join(', ')}` : '',
-        // Ya esta incluido en el precio del vuelo (buildFlightOffer en
-        // SeatSelectionPage.jsx lo reparte entre viajeros): esto es solo el
-        // desglose, para que quede claro de donde sale la diferencia.
-        seatsExtraCents > 0 ? `+${dineroDeCentavos(seatsExtraCents, currency)} por asientos` : '',
       ].filter(Boolean).join(' · ')
     : '';
 
