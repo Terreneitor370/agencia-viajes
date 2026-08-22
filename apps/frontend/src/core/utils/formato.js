@@ -53,3 +53,16 @@ export function formulaDeConcepto({ modo, precioUnitario, moneda = 'MXN', viajer
 export const habitacionesPara = (viajeros) => Math.ceil(Math.max(1, viajeros) / 2);
 
 export const plural = (n, singular, pluralForma) => `${n} ${n === 1 ? singular : pluralForma}`;
+
+/**
+ * Fecha de un Date en YYYY-MM-DD, en la zona LOCAL del navegador -- no usar
+ * date.toISOString().split('T')[0] para esto: toISOString primero convierte
+ * a UTC, asi que en cualquier huso al oeste de UTC (todo Mexico) esa cuenta
+ * ya se paso al dia siguiente desde media tarde en adelante. Con eso, un
+ * input date con min={hoy calculado asi} bloqueaba justo la fecha de hoy en
+ * esas horas -- el sintoma que se reporto ("no deja elegir hoy").
+ */
+export const fechaLocalISO = (date = new Date()) => {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+};

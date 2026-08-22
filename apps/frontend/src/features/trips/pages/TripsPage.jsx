@@ -5,17 +5,17 @@ import Boton from '../../../components/ui/Boton';
 import Campo from '../../../components/ui/Campo';
 import Distintivo from '../../../components/ui/Distintivo';
 import Tarjeta from '../../../components/ui/Tarjeta';
-import { dinero, plural } from '../../../core/utils/formato';
+import { dinero, fechaLocalISO, plural } from '../../../core/utils/formato';
 import { paymentsApi } from '../../payments/api';
 import { tripsApi } from '../api';
 
 const fechaMxCorta = (iso) => new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short' })
   .format(new Date(`${iso}T00:00:00`));
 
-const toInputDate = (date) => {
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 10);
-};
+// Misma logica que fechaLocalISO en core/utils/formato.js -- se comparte
+// desde ahi para que nadie mas la reimplemente con toISOString() directo,
+// que si tiene el bug de zona horaria (ver el comentario de fechaLocalISO).
+const toInputDate = fechaLocalISO;
 
 const addDays = (iso, days) => {
   const d = new Date(`${iso}T00:00:00`);

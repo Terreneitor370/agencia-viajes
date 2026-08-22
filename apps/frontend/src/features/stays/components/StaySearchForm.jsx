@@ -1,16 +1,17 @@
 import { useState } from 'react';
+import { fechaLocalISO } from '../../../core/utils/formato';
 
 const clamp = (n, min, max) => Math.min(max, Math.max(min, Number.isNaN(n) ? min : n));
 
 export default function StaySearchForm({ onSearch, loading, defaultValues = {}, onCurrencyChange }) {
   // Fechas para el input date
   const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
-  
+  const todayStr = fechaLocalISO(today);
+
   // Fecha máxima: 11 meses después
   const maxDate = new Date(today);
   maxDate.setMonth(maxDate.getMonth() + 11);
-  const maxDateStr = maxDate.toISOString().split('T')[0];
+  const maxDateStr = fechaLocalISO(maxDate);
 
   const [form, setForm] = useState({
     city: defaultValues.city || '',

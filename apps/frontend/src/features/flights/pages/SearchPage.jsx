@@ -11,14 +11,15 @@ import Hero from '../../shared/Hero';
 import PopularOptions from '../../shared/PopularOptions';
 import { tripsApi } from '../../trips/api';
 import { guardarBusqueda, leerBusqueda } from '../../shared/searchSessionMemory';
+import { fechaLocalISO } from '../../../core/utils/formato';
 
 const HERO_IMAGE = 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=1600&q=60';
 
 const today = new Date();
-const todayStr = today.toISOString().split('T')[0];
+const todayStr = fechaLocalISO(today);
 const maxDate = new Date(today);
 maxDate.setMonth(maxDate.getMonth() + 11);
-const maxDateStr = maxDate.toISOString().split('T')[0];
+const maxDateStr = fechaLocalISO(maxDate);
 
 const MAX_PAX = 9;
 
@@ -150,6 +151,34 @@ export default function SearchPage() {
       cancelled = true;
     };
   }, [isAuthenticated, flowTripId]);
+
+  // El selector "Dirigir reserva al viaje" defaultea al mas reciente
+  // (listByUser ordena por created_at DESC), sin avisar si ese viaje ya
+  // tenia un vuelo guardado sin pagar -- Isa lo reporto: el vuelo nuevo se
+  // sumaba aparte sin que el usuario se diera cuenta. replaceFlightFlow no
+  // necesita este aviso: ese flujo ya deja claro que va a reemplazar.
+  const [selectedTripHasFlight, setSelectedTripHasFlight] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkFlight = async () => {
+      if (!isAuthenticated || !tripId || replaceFlightFlow) {
+        if (!cancelled) setSelectedTripHasFlight(false);
+        return;
+      }
+      try {
+        const res = await tripsApi.detail(tripId);
+        if (cancelled) return;
+        const items = Array.isArray(res.data?.items) ? res.data.items : [];
+        setSelectedTripHasFlight(items.some((item) => item.type === 'flight'));
+      } catch {
+        if (!cancelled) setSelectedTripHasFlight(false);
+      }
+    };
+
+    checkFlight();
+    return () => { cancelled = true; };
+  }, [tripId, isAuthenticated, replaceFlightFlow]);
 
   const cityByIata = useMemo(() => Object.fromEntries(
     airports
@@ -306,6 +335,14 @@ export default function SearchPage() {
   };
 
   const onSelectFlight = (offer) => {
+    if (selectedTripHasFlight) {
+      const continuar = window.confirm(
+        'El viaje que elegiste ya tiene un vuelo guardado sin pagar. Si continuas, este se agrega aparte -- no lo reemplaza.\n\n'
+        + 'Para cambiar el vuelo existente, usa "Cambiar vuelo" desde el detalle de ese viaje en vez de esto.\n\n'
+        + '¿Quieres agregar este vuelo de todas formas?',
+      );
+      if (!continuar) return;
+    }
     navigate(buildSeatSelectionUrl(offer));
   };
 
@@ -534,6 +571,12 @@ export default function SearchPage() {
               </option>
             ))}
           </select>
+          {selectedTripHasFlight && (
+            <p className="mt-2 rounded-md border border-ambar-400 bg-ambar-50 px-3 py-2 text-xs text-ambar-700">
+              Este viaje ya tiene un vuelo guardado sin pagar. Si agregas otro, se suma aparte -- no lo reemplaza.
+              Para cambiarlo, ve al detalle del viaje y usa &quot;Cambiar vuelo&quot;.
+            </p>
+          )}
         </div>
       )}
 
