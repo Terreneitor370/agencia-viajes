@@ -20,6 +20,27 @@ const INTERESES = [
   { value: 'compras', label: 'Compras' },
 ];
 
+// Geoapify no da fotos en el plan gratuito, asi que en vez de dejar la
+// tarjeta vacia se usa un icono por categoria. Las categorias que llegan son
+// las mismas de CATEGORY_MAP en experiences.schema.js (ej. "catering.restaurant",
+// "entertainment.museum") -- el mapeo es por el prefijo antes del punto, no
+// el valor completo, porque Geoapify tiene muchas subcategorias por prefijo.
+const ICONO_POR_PREFIJO = {
+  catering: '🍽️',
+  entertainment: '🎭',
+  tourism: '🗺️',
+  natural: '🌳',
+  leisure: '🌳',
+  sport: '🏄',
+  adult: '🌃',
+  commercial: '🛍️',
+};
+
+function iconoExperiencia(categories) {
+  const prefijo = String(categories?.[0] || '').split('.')[0];
+  return ICONO_POR_PREFIJO[prefijo] || '📍';
+}
+
 const normalizeTrip = (trip) => ({
   id: trip.id,
   title: trip.title,
@@ -461,8 +482,8 @@ export default function ExperiencesPage() {
 
           return (
             <Tarjeta key={experience.id} className="overflow-hidden">
-              <div className="grid h-28 place-items-center border-b border-borde bg-lienzo text-menor text-tinta-300">
-                foto experiencia
+              <div className="grid h-28 place-items-center border-b border-borde bg-lienzo text-4xl" aria-hidden="true">
+                {iconoExperiencia(experience.categories)}
               </div>
 
               <div className="p-4">
