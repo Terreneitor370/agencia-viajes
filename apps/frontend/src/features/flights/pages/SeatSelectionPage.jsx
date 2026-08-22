@@ -86,7 +86,6 @@ export default function SeatSelectionPage() {
   const airline = params.get('airline') || '';
   const hasReturn = Boolean(retOrigin);
   const backParams = params.get('backParams') || '';
-  const replaceTarget = params.get('replaceTarget') || '';
   const replaceItemId = params.get('replaceItemId') || '';
   const returnTo = params.get('returnTo') || '';
 
