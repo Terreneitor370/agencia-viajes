@@ -56,8 +56,7 @@ exports.refresh = async (req, res) => {
 
 exports.logout = async (req, res) => {
   await service.logout(req.user.id, req);
-  res.clearCookie('access_token', { path: '/' });
-  res.clearCookie('refresh_token', { path: '/api/v1/auth/refresh' });
+  tokens.clearAuthCookies(res);
   return respond.noContent(res);
 };
 
@@ -68,8 +67,7 @@ exports.me = async (req, res) => respond.ok(res, {
 
 exports.changePassword = async (req, res) => {
   await service.changePassword(req.user.id, req.body, req);
-  res.clearCookie('access_token', { path: '/' });
-  res.clearCookie('refresh_token', { path: '/api/v1/auth/refresh' });
+  tokens.clearAuthCookies(res);
   return respond.noContent(res);
 };
 
@@ -83,8 +81,7 @@ exports.resetPassword = async (req, res) => {
   await service.resetPassword(req.body, req);
   // Por si acaso hubiera cookies de una sesion vieja en este navegador: la
   // contrasena cambio, esa sesion ya no deberia seguir viendose como valida.
-  res.clearCookie('access_token', { path: '/' });
-  res.clearCookie('refresh_token', { path: '/api/v1/auth/refresh' });
+  tokens.clearAuthCookies(res);
   return respond.noContent(res);
 };
 

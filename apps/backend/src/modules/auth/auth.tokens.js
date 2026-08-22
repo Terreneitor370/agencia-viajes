@@ -44,4 +44,23 @@ const refreshCookie = {
   maxAge: env.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000,
 };
 
-module.exports = { sha256, signAccessToken, generateRefreshToken, accessCookie, refreshCookie };
+/**
+ * Borra las dos cookies de sesion. Tiene que usar EXACTAMENTE el mismo
+ * domain/path con el que se establecieron (accessCookie/refreshCookie de
+ * arriba) -- un Set-Cookie de borrado sin domain no sobreescribe una cookie
+ * que si se guardo con Domain=... explicito (asi es como Chrome/Firefox la
+ * indexan), el navegador los trata como dos cookies distintas. En produccion
+ * (COOKIE_DOMAIN explicito) eso dejaba la cookie real intacta: la sesion
+ * "cerraba" en la pantalla porque el estado de React se limpiaba, pero
+ * volvia a aparecer logueada en la siguiente visita porque la cookie de
+ * verdad nunca se borro. No se notaba en desarrollo porque ahi domain es
+ * undefined en los dos lados (set y clear), asi que coincidian por accidente.
+ */
+function clearAuthCookies(res) {
+  res.clearCookie('access_token', { path: accessCookie.path, domain: accessCookie.domain });
+  res.clearCookie('refresh_token', { path: refreshCookie.path, domain: refreshCookie.domain });
+}
+
+module.exports = {
+  sha256, signAccessToken, generateRefreshToken, accessCookie, refreshCookie, clearAuthCookies,
+};
