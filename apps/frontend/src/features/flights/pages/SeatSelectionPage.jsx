@@ -9,6 +9,64 @@ import { buildStaysUrl, construirCargosDeAsientos, construirPayload, guardarPend
 const time = (iso) =>
   iso ? new Date(iso).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : '--';
 
+/**
+ * Resumen de precio visible antes de continuar, al estilo Booking: el vuelo
+ * base y cada asiento elegido, agrupado por tramo, con un total que se
+ * actualiza en vivo conforme se elige en el mapa -- antes el unico precio
+ * visible en esta pantalla era el de cada asiento suelto (el tooltip del
+ * mapa) mas un "Costo extra: $X" sin el total del vuelo, asi que nunca se
+ * veia cuanto se iba a pagar en total antes de seguir al paso 3.
+ */
+function dineroEn(currency) {
+  return (amount) => new Intl.NumberFormat('es-MX', { style: 'currency', currency }).format(amount);
+}
+
+function TramoAsientos({ titulo, seats, pendiente, dinero }) {
+  if (pendiente) {
+    return (
+      <div className="flex items-center justify-between text-xs text-tinta-400">
+        <span>{titulo}</span>
+        <span>Aun por elegir</span>
+      </div>
+    );
+  }
+  if (!seats.length) return null;
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-semibold text-tinta-700">{titulo}</p>
+      {seats.map((s) => (
+        <div key={s.designator} className="flex items-center justify-between pl-2 text-xs text-tinta-500">
+          <span>Asiento {s.designator}</span>
+          <span>{s.price > 0 ? dinero(s.price) : 'Incluido'}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ResumenPrecio({ priceAmount, priceCurrency, travelers, outbound, ret, hasReturn }) {
+  const dinero = dineroEn(priceCurrency);
+  const baseTotal = priceAmount * travelers;
+  const seatsTotal = [...outbound, ...ret].reduce((sum, s) => sum + s.price, 0);
+  const total = baseTotal + seatsTotal;
+
+  return (
+    <div className="rounded-md border border-borde bg-superficie p-4 space-y-2.5">
+      <p className="text-sm font-semibold text-tinta-900">Resumen del precio</p>
+      <div className="flex items-center justify-between text-sm text-tinta-700">
+        <span>Vuelo{hasReturn ? ' redondo' : ''} · {travelers} {travelers === 1 ? 'viajero' : 'viajeros'}</span>
+        <span>{dinero(baseTotal)}</span>
+      </div>
+      <TramoAsientos titulo="Asientos · ida" seats={outbound} dinero={dinero} />
+      {hasReturn && <TramoAsientos titulo="Asientos · regreso" seats={ret} pendiente={!ret.length} dinero={dinero} />}
+      <div className="flex items-center justify-between border-t border-borde pt-2 text-sm font-semibold text-tinta-900">
+        <span>Total estimado</span>
+        <span>{dinero(total)}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function SeatSelectionPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
@@ -68,6 +126,25 @@ export default function SeatSelectionPage() {
     navigate(`/buscar${backParams ? `?${backParams}` : ''}`);
   };
 
+  const priceAmount = Number(params.get('priceAmount')) || 0;
+  const priceCurrency = params.get('priceCurrency') || 'MXN';
+
+  // seat.price viene en baseCurrency (la moneda que reporta Duffel para los
+  // asientos, ver el useEffect de arriba), no necesariamente la misma que
+  // priceCurrency (la del vuelo): se convierte aqui, una sola vez, con el
+  // mismo currencyRate que ya se usaba para mostrar el precio en el mapa --
+  // tanto el resumen de precio de esta pantalla como buildFlightOffer() (lo
+  // que se guarda) parten de esta misma conversion, para no calcularla dos
+  // veces con resultados que podrian no coincidir.
+  const convertirSeats = (seats, tramo) => (seats || []).map((s) => ({
+    designator: s.designator,
+    price: Math.round(Number(s.price) * currencyRate * 100) / 100,
+    currency: priceCurrency,
+    tramo,
+  }));
+  const outboundConvertido = convertirSeats(seatOutbound, 'ida');
+  const returnConvertido = convertirSeats(seatReturn, 'regreso');
+
   // Comun a ambas ramas de abajo (con sesion y sin sesion): antes cada una
   // armaba su propio objeto por separado y ninguna incluia los asientos
   // elegidos en MapaAsientos.jsx, asi que la seleccion se perdia siempre al
@@ -78,40 +155,20 @@ export default function SeatSelectionPage() {
   // 'per_person' solo admite un unico precio que se multiplica por
   // travelers -- no hay forma de que ese precio unico represente montos
   // distintos por persona.
-  //
-  // seat.price viene en baseCurrency (la moneda que reporta Duffel para los
-  // asientos, ver el useEffect de arriba), no necesariamente la misma que
-  // priceCurrency (la del vuelo): se convierte aqui mismo, una sola vez, con
-  // el mismo currencyRate que MapaAsientos.jsx ya usa para mostrar "Costo
-  // extra: $X" en pantalla -- asi todo lo que lee item.seats despues
-  // (construirCargosDeAsientos, el resumen que se muestra en el itinerario,
-  // y PendingTripItemResolver.jsx si el login interrumpe el flujo) encuentra
-  // el precio ya en una sola moneda consistente, sin tener que volver a
-  // convertir con una tasa que ya no tendria de donde sacar.
-  const buildFlightOffer = () => {
-    const priceCurrency = params.get('priceCurrency') || 'MXN';
-    const convertir = (seats, tramo) => (seats || []).map((s) => ({
-      designator: s.designator,
-      price: Math.round(Number(s.price) * currencyRate * 100) / 100,
-      currency: priceCurrency,
-      tramo,
-    }));
-    const outbound = convertir(seatOutbound, 'ida');
-    const ret = convertir(seatReturn, 'regreso');
-
-    return {
-      externalId: offerId,
-      origin,
-      destination,
-      departureAt,
-      airline,
-      price: { amount: Number(params.get('priceAmount')) || 0, currency: priceCurrency },
-      provider: params.get('provider') || 'unknown',
-      pricingMode: 'per_person',
-      return: retOrigin ? { departureAt: retDepartureAt } : null,
-      seats: (outbound.length || ret.length) ? { outbound, return: ret } : null,
-    };
-  };
+  const buildFlightOffer = () => ({
+    externalId: offerId,
+    origin,
+    destination,
+    departureAt,
+    airline,
+    price: { amount: priceAmount, currency: priceCurrency },
+    provider: params.get('provider') || 'unknown',
+    pricingMode: 'per_person',
+    return: retOrigin ? { departureAt: retDepartureAt } : null,
+    seats: (outboundConvertido.length || returnConvertido.length)
+      ? { outbound: outboundConvertido, return: returnConvertido }
+      : null,
+  });
 
   const addToTripAndGoToStays = async () => {
     if (!isAuthenticated) {
@@ -238,6 +295,17 @@ export default function SeatSelectionPage() {
             onSeatsSelect={setSeatReturn}
           />
         </div>
+      )}
+
+      {seatMapAvailable !== null && (
+        <ResumenPrecio
+          priceAmount={priceAmount}
+          priceCurrency={priceCurrency}
+          travelers={travelers}
+          outbound={outboundConvertido}
+          ret={returnConvertido}
+          hasReturn={hasReturn}
+        />
       )}
 
       <div className="flex items-center justify-between pt-2">
