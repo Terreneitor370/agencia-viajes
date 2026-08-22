@@ -88,6 +88,20 @@ const hasPaidOrder = (data) => {
   return rows.some((row) => row?.status === 'paid');
 };
 
+// Espejo de maxTravelersFromSeats en trips.controller.js -- se recalcula
+// aqui para bloquear el boton "+" al instante, sin esperar el roundtrip;
+// el backend sigue siendo quien de verdad lo exige (assertTravelersFitSeats).
+const maxTravelersFromSeats = (items) => {
+  let min = null;
+  for (const item of items || []) {
+    if (item.type !== 'flight' || !item.meta?.seats) continue;
+    const { outbound, return: ret } = item.meta.seats;
+    const count = Math.max(outbound?.length || 0, ret?.length || 0);
+    if (count > 0) min = min === null ? count : Math.min(min, count);
+  }
+  return min ?? 20;
+};
+
 // Este subtotal es informativo para la tabla. El total oficial siempre viene del backend.
 const subtotalItem = (item, tripStats) => {
   const qty = Math.max(1, Number(item.quantity || 1));
@@ -259,6 +273,7 @@ export default function TripDetailPage() {
   }, [id]);
 
   const tripIsPaid = Boolean(trip?.isPaid || paidByOrder);
+  const maxTravelersAllowed = useMemo(() => maxTravelersFromSeats(trip?.items), [trip?.items]);
 
   const refreshPaidLock = async () => {
     if (!trip?.id) return false;
@@ -576,6 +591,7 @@ export default function TripDetailPage() {
           tripId={trip.id}
           currency={trip.currency}
           isReadOnly={tripIsPaid}
+          maxTravelers={maxTravelersAllowed}
           className="lg:sticky lg:top-4"
         />
       </div>

@@ -35,6 +35,43 @@ async function assertTripEditable(trip, userId) {
   }
 }
 
+/**
+ * Minimo de asientos elegidos entre los vuelos del viaje que si tienen
+ * seleccion (SeatSelectionPage.jsx guarda item.meta.seats; algunos vuelos
+ * pueden no tener ninguno, ej. aerolinea sin mapa disponible -- esos no
+ * limitan nada). Null si ningun vuelo del viaje tiene asientos elegidos.
+ */
+function maxTravelersFromSeats(items) {
+  let min = null;
+  for (const item of items) {
+    if (item.type !== 'flight' || !item.meta?.seats) continue;
+    const { outbound, return: ret } = item.meta.seats;
+    const count = Math.max(outbound?.length || 0, ret?.length || 0);
+    if (count > 0) min = min === null ? count : Math.min(min, count);
+  }
+  return min;
+}
+
+/**
+ * pricingMode 'per_person' cobra por cada viajero, pero los asientos
+ * elegidos son numeros fijos (12A, 12B...) que no aparecen solos al subir
+ * el contador: sin este chequeo, subir viajeros despues de elegir asientos
+ * cobraba de mas por gente sin asiento asignado. No se puede "agregar el
+ * asiento que falta" a una oferta ya guardada porque las ofertas de Duffel
+ * expiran a los pocos minutos -- por eso el mensaje manda a "Cambiar vuelo"
+ * (busca una oferta nueva) en vez de prometer completar la vieja.
+ */
+async function assertTravelersFitSeats(trip, userId, nextTravelers) {
+  const items = await repo.listItems(trip.id, userId);
+  const maxPorAsientos = maxTravelersFromSeats(items);
+  if (maxPorAsientos !== null && nextTravelers > maxPorAsientos) {
+    const palabra = maxPorAsientos === 1 ? 'viajero' : 'viajeros';
+    throw ApiError.conflict(
+      `Ya elegiste asientos para ${maxPorAsientos} ${palabra}. Usa "Cambiar vuelo" para volver a elegir los asientos con el nuevo numero de viajeros.`,
+    );
+  }
+}
+
 exports.list = async (req, res) => {
   const { page, pageSize } = req.query;
   const [trips, total] = await Promise.all([
@@ -74,6 +111,10 @@ exports.update = async (req, res) => {
     throw ApiError.badRequest('La fecha de regreso debe ser posterior a la de salida', { path: ['endDate'] });
   }
 
+  if (Object.hasOwn(patch, 'travelers') && next.travelers !== trip.travelers) {
+    await assertTravelersFitSeats(trip, req.user.id, next.travelers);
+  }
+
   await repo.update(req.params.id, req.user.id, next);
   const updated = await repo.findByIdForUser(req.params.id, req.user.id);
   return respond.ok(res, await withPaidFlag(updated, req.user.id));
@@ -106,6 +147,7 @@ exports.budget = async (req, res) => {
 exports.updateTravelers = async (req, res) => {
   const trip = await loadOwnTrip(req);
   await assertTripEditable(trip, req.user.id);
+  await assertTravelersFitSeats(trip, req.user.id, req.body.travelers);
   await repo.updateTravelers(trip.id, req.user.id, req.body.travelers);
   return exports.budget(req, res); // devuelve el presupuesto ya recalculado
 };

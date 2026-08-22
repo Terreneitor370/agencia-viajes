@@ -60,8 +60,15 @@ function Breakdown({ budget, currency }) {
   );
 }
 
-function TravelersControl({ travelers, onChange, busy, disabled = false }) {
+function TravelersControl({ travelers, onChange, busy, disabled = false, maxAllowed = 20 }) {
   const locked = busy || disabled;
+  // Subir mas alla de los asientos ya elegidos cobraria per_person por gente
+  // sin asiento asignado (ver assertTravelersFitSeats en trips.controller.js,
+  // que es quien de verdad lo bloquea). No se puede "completar" el asiento
+  // que falta porque la oferta de Duffel del vuelo guardado ya expiro -- por
+  // eso el mensaje manda a "Cambiar vuelo" (busca una oferta nueva) en vez
+  // de ofrecer agregar el asiento aqui mismo.
+  const seatLimited = maxAllowed < 20 && travelers >= maxAllowed;
 
   return (
     <div>
@@ -83,7 +90,7 @@ function TravelersControl({ travelers, onChange, busy, disabled = false }) {
             onClick={() => onChange(travelers + 1)}
             className="h-6 w-6 rounded border border-borde text-tinta-700 hover:bg-lienzo"
             aria-label="Aumentar viajeros"
-            disabled={locked}
+            disabled={locked || seatLimited}
           >
             +
           </button>
@@ -93,7 +100,7 @@ function TravelersControl({ travelers, onChange, busy, disabled = false }) {
       <input
         type="range"
         min={1}
-        max={20}
+        max={Math.min(20, maxAllowed)}
         value={travelers}
         disabled={locked}
         onChange={(event) => onChange(event.target.value)}
@@ -102,6 +109,11 @@ function TravelersControl({ travelers, onChange, busy, disabled = false }) {
 
       {busy && <p className="mt-1 text-menor text-tinta-500">Recalculando...</p>}
       {!busy && disabled && <p className="mt-1 text-menor text-tinta-500">Bloqueado por pago confirmado.</p>}
+      {!busy && !disabled && seatLimited && (
+        <p className="mt-1 text-menor text-ambar-700">
+          Ya elegiste asientos para {maxAllowed} {maxAllowed === 1 ? 'viajero' : 'viajeros'}. Usa &quot;Cambiar vuelo&quot; para agregar mas.
+        </p>
+      )}
     </div>
   );
 }
@@ -114,6 +126,7 @@ function BudgetContent({
   tripId,
   currency: currencyProp,
   isReadOnly = false,
+  maxTravelers = 20,
 }) {
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState('');
@@ -165,7 +178,7 @@ function BudgetContent({
         <p className="text-menor text-tinta-500">{dinero(budget?.perPerson, currency)} por persona</p>
       </header>
 
-      <TravelersControl travelers={travelers} onChange={onChangeTravelers} busy={busy} disabled={isPaid} />
+      <TravelersControl travelers={travelers} onChange={onChangeTravelers} busy={busy} disabled={isPaid} maxAllowed={maxTravelers} />
 
       <div className={busy ? 'opacity-60 transition-opacity duration-realce' : 'transition-opacity duration-realce'}>
         {!budget ? (
@@ -251,6 +264,7 @@ export default function BudgetPanel({
   tripId,
   currency,
   isReadOnly = false,
+  maxTravelers = 20,
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const safeTravelers = clampTravelers(travelers);
@@ -280,6 +294,7 @@ export default function BudgetPanel({
           tripId={tripId}
           currency={currency}
           isReadOnly={isReadOnly}
+          maxTravelers={maxTravelers}
         />
       </aside>
 
@@ -317,6 +332,7 @@ export default function BudgetPanel({
               tripId={tripId}
               currency={currency}
               isReadOnly={isReadOnly}
+              maxTravelers={maxTravelers}
             />
           </div>
         )}
